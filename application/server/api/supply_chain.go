@@ -18,13 +18,20 @@ func NewSupplyChainHandler() *SupplyChainHandler {
 	}
 }
 
-// CreateOrder 主机厂发布订单
+// CreateOrder godoc
+// @Summary      创建订单
+// @Description  主机厂(OEM)发布零部件采购订单到指定制造商
+// @Tags         OEM
+// @Accept       json
+// @Produce      json
+// @Param        request  body      CreateOrderRequest  true  "订单信息"
+// @Success      200      {object}  utils.Response{data=string}  "订单创建成功"
+// @Failure      400      {object}  utils.Response  "请求参数错误"
+// @Failure      500      {object}  utils.Response  "服务器内部错误"
+// @Router       /oem/order/create [post]
+// @Security     ApiKeyAuth
 func (h *SupplyChainHandler) CreateOrder(c *gin.Context) {
-	var req struct {
-		ID             string      `json:"id"`
-		ManufacturerID string      `json:"manufacturerId"`
-		Items          interface{} `json:"items"`
-	}
+	var req CreateOrderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.BadRequest(c, "无效的请求参数")
 		return
@@ -39,7 +46,17 @@ func (h *SupplyChainHandler) CreateOrder(c *gin.Context) {
 	utils.SuccessWithMessage(c, "订单已发布", nil)
 }
 
-// AcceptOrder 零部件厂接受订单
+// AcceptOrder godoc
+// @Summary      接受订单
+// @Description  零部件厂商接受主机厂发布的订单
+// @Tags         Manufacturer
+// @Accept       json
+// @Produce      json
+// @Param        id   path      string  true  "订单ID"  example(ORDER001)
+// @Success      200  {object}  utils.Response{data=string}  "订单接受成功"
+// @Failure      500  {object}  utils.Response  "服务器内部错误"
+// @Router       /manufacturer/order/{id}/accept [put]
+// @Security     ApiKeyAuth
 func (h *SupplyChainHandler) AcceptOrder(c *gin.Context) {
 	id := c.Param("id")
 	if err := h.scService.AcceptOrder(id); err != nil {
@@ -50,12 +67,22 @@ func (h *SupplyChainHandler) AcceptOrder(c *gin.Context) {
 	utils.SuccessWithMessage(c, "订单已接受", nil)
 }
 
-// UpdateStatus 更新状态
+// UpdateStatus godoc
+// @Summary      更新生产状态
+// @Description  零部件厂商更新订单的生产进度状态
+// @Tags         Manufacturer
+// @Accept       json
+// @Produce      json
+// @Param        id       path      string                 true  "订单ID"  example(ORDER001)
+// @Param        request  body      UpdateStatusRequest    true  "状态信息"
+// @Success      200      {object}  utils.Response{data=string}  "状态更新成功"
+// @Failure      400      {object}  utils.Response  "请求参数错误"
+// @Failure      500      {object}  utils.Response  "服务器内部错误"
+// @Router       /manufacturer/order/{id}/status [put]
+// @Security     ApiKeyAuth
 func (h *SupplyChainHandler) UpdateStatus(c *gin.Context) {
 	id := c.Param("id")
-	var req struct {
-		Status string `json:"status"`
-	}
+	var req UpdateStatusRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.BadRequest(c, "参数错误")
 		return
@@ -71,12 +98,20 @@ func (h *SupplyChainHandler) UpdateStatus(c *gin.Context) {
 	utils.SuccessWithMessage(c, "状态已更新", nil)
 }
 
-// PickupGoods 承运商取货
+// PickupGoods godoc
+// @Summary      取货并生成物流单
+// @Description  承运商从制造商处取货，创建物流跟踪单
+// @Tags         Carrier
+// @Accept       json
+// @Produce      json
+// @Param        request  body      PickupGoodsRequest  true  "取货信息"
+// @Success      200      {object}  utils.Response{data=string}  "取货成功"
+// @Failure      400      {object}  utils.Response  "请求参数错误"
+// @Failure      500      {object}  utils.Response  "服务器内部错误"
+// @Router       /carrier/shipment/pickup [post]
+// @Security     ApiKeyAuth
 func (h *SupplyChainHandler) PickupGoods(c *gin.Context) {
-	var req struct {
-		OrderID    string `json:"orderId"`
-		ShipmentID string `json:"shipmentId"`
-	}
+	var req PickupGoodsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.BadRequest(c, "参数错误")
 		return
@@ -89,12 +124,22 @@ func (h *SupplyChainHandler) PickupGoods(c *gin.Context) {
 	utils.SuccessWithMessage(c, "已取货并生成物流单", nil)
 }
 
-// UpdateLocation 更新物流位置
+// UpdateLocation godoc
+// @Summary      更新物流位置
+// @Description  承运商上报货物当前位置信息
+// @Tags         Carrier
+// @Accept       json
+// @Produce      json
+// @Param        id       path      string                   true  "物流单ID"  example(SHIP001)
+// @Param        request  body      UpdateLocationRequest    true  "位置信息"
+// @Success      200      {object}  utils.Response{data=string}  "位置更新成功"
+// @Failure      400      {object}  utils.Response  "请求参数错误"
+// @Failure      500      {object}  utils.Response  "服务器内部错误"
+// @Router       /carrier/shipment/{id}/location [put]
+// @Security     ApiKeyAuth
 func (h *SupplyChainHandler) UpdateLocation(c *gin.Context) {
 	id := c.Param("id") // shipmentId
-	var req struct {
-		Location string `json:"location"`
-	}
+	var req UpdateLocationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.BadRequest(c, "参数错误")
 		return
@@ -107,7 +152,17 @@ func (h *SupplyChainHandler) UpdateLocation(c *gin.Context) {
 	utils.SuccessWithMessage(c, "位置已更新", nil)
 }
 
-// ConfirmReceipt 主机厂签收
+// ConfirmReceipt godoc
+// @Summary      确认收货
+// @Description  主机厂确认收到货物，订单完成
+// @Tags         OEM
+// @Accept       json
+// @Produce      json
+// @Param        id   path      string  true  "订单ID"  example(ORDER001)
+// @Success      200  {object}  utils.Response{data=string}  "签收成功"
+// @Failure      500  {object}  utils.Response  "服务器内部错误"
+// @Router       /oem/order/{id}/receive [put]
+// @Security     ApiKeyAuth
 func (h *SupplyChainHandler) ConfirmReceipt(c *gin.Context) {
 	id := c.Param("id")
 	if err := h.scService.ConfirmReceipt(id); err != nil {
@@ -117,7 +172,17 @@ func (h *SupplyChainHandler) ConfirmReceipt(c *gin.Context) {
 	utils.SuccessWithMessage(c, "订单已签收完成", nil)
 }
 
-// QueryShipment 查询物流详情
+// QueryShipment godoc
+// @Summary      查询物流详情
+// @Description  根据物流单ID查询物流跟踪信息
+// @Tags         Carrier
+// @Accept       json
+// @Produce      json
+// @Param        id   path      string  true  "物流单ID"  example(SHIP001)
+// @Success      200  {object}  utils.Response{data=Shipment}  "查询成功"
+// @Failure      500  {object}  utils.Response  "服务器内部错误"
+// @Router       /carrier/shipment/{id} [get]
+// @Security     ApiKeyAuth
 func (h *SupplyChainHandler) QueryShipment(c *gin.Context) {
 	id := c.Param("id")
 	shipment, err := h.scService.QueryShipment(id)
@@ -128,7 +193,17 @@ func (h *SupplyChainHandler) QueryShipment(c *gin.Context) {
 	utils.Success(c, shipment)
 }
 
-// QueryOrder 查询详情
+// QueryOrder godoc
+// @Summary      查询订单详情
+// @Description  根据订单ID查询订单的完整信息
+// @Tags         OEM
+// @Accept       json
+// @Produce      json
+// @Param        id   path      string  true  "订单ID"  example(ORDER001)
+// @Success      200  {object}  utils.Response{data=Order}  "查询成功"
+// @Failure      500  {object}  utils.Response  "服务器内部错误"
+// @Router       /oem/order/{id} [get]
+// @Security     ApiKeyAuth
 func (h *SupplyChainHandler) QueryOrder(c *gin.Context) {
 	id := c.Param("id")
 	order, err := h.scService.QueryOrder(id)
@@ -139,7 +214,24 @@ func (h *SupplyChainHandler) QueryOrder(c *gin.Context) {
 	utils.Success(c, order)
 }
 
-// QueryOrderList 分页列表
+// QueryOrderList godoc
+// @Summary      分页查询订单列表
+// @Description  支持分页查询订单列表，使用bookmark实现翻页
+// @Tags         OEM
+// @Tags         Manufacturer
+// @Tags         Carrier
+// @Tags         Platform
+// @Accept       json
+// @Produce      json
+// @Param        pageSize  query     int     false  "每页数量"  default(10)  minimum(1)  maximum(100)
+// @Param        bookmark  query     string  false  "分页书签（上次查询返回的bookmark）"
+// @Success      200       {object}  utils.Response{data=OrderListResponse}  "查询成功"
+// @Failure      500       {object}  utils.Response  "服务器内部错误"
+// @Router       /oem/order/list [get]
+// @Router       /manufacturer/order/list [get]
+// @Router       /carrier/order/list [get]
+// @Router       /platform/order/list [get]
+// @Security     ApiKeyAuth
 func (h *SupplyChainHandler) QueryOrderList(c *gin.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
 	bookmark := c.DefaultQuery("bookmark", "")

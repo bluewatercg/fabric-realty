@@ -1,0 +1,648 @@
+basePath: /api
+definitions:
+  api.CreateOrderRequest:
+    properties:
+      id:
+        example: ORDER001
+        minLength: 1
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/api.OrderItem'
+        type: array
+      manufacturerId:
+        example: MFG001
+        type: string
+    required:
+    - id
+    - items
+    - manufacturerId
+    type: object
+  api.Order:
+    properties:
+      acceptedAt:
+        type: string
+      createdAt:
+        example: "2024-01-01T00:00:00Z"
+        type: string
+      deliveredAt:
+        type: string
+      id:
+        example: ORDER001
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/api.OrderItem'
+        type: array
+      manufacturerId:
+        example: MFG001
+        type: string
+      oemId:
+        example: OEM001
+        type: string
+      producedAt:
+        type: string
+      status:
+        enum:
+        - Created
+        - Accepted
+        - InProduction
+        - Produced
+        - PickedUp
+        - InTransit
+        - Delivered
+        example: Created
+        type: string
+      updatedAt:
+        example: "2024-01-02T10:30:00Z"
+        type: string
+    type: object
+  api.OrderItem:
+    properties:
+      partName:
+        example: 发动机缸体
+        type: string
+      partNumber:
+        example: PART-12345
+        type: string
+      quantity:
+        example: 100
+        minimum: 1
+        type: integer
+      specification:
+        example: 标准规格
+        type: string
+      unitPrice:
+        example: 125.5
+        minimum: 0
+        type: number
+    type: object
+  api.OrderListResponse:
+    properties:
+      bookmark:
+        example: g1AAAAG...
+        type: string
+      orders:
+        items:
+          $ref: '#/definitions/api.Order'
+        type: array
+    type: object
+  api.PickupGoodsRequest:
+    properties:
+      orderId:
+        example: ORDER001
+        type: string
+      shipmentId:
+        example: SHIP001
+        type: string
+    required:
+    - orderId
+    - shipmentId
+    type: object
+  api.Shipment:
+    properties:
+      carrierId:
+        example: CARRIER001
+        type: string
+      id:
+        example: SHIP001
+        type: string
+      locations:
+        items:
+          $ref: '#/definitions/api.ShipmentLocation'
+        type: array
+      orderId:
+        example: ORDER001
+        type: string
+      pickupAt:
+        example: "2024-01-03T08:00:00Z"
+        type: string
+      status:
+        example: InTransit
+        type: string
+      updatedAt:
+        example: "2024-01-03T12:00:00Z"
+        type: string
+    type: object
+  api.ShipmentLocation:
+    properties:
+      location:
+        example: 北京市朝阳区
+        type: string
+      timestamp:
+        example: "2024-01-03T12:00:00Z"
+        type: string
+    type: object
+  api.UpdateLocationRequest:
+    properties:
+      location:
+        example: 北京市朝阳区
+        type: string
+    required:
+    - location
+    type: object
+  api.UpdateStatusRequest:
+    properties:
+      status:
+        enum:
+        - InProduction
+        - Produced
+        example: InProduction
+        type: string
+    required:
+    - status
+    type: object
+  utils.Response:
+    properties:
+      code:
+        type: integer
+      data: {}
+      message:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@example.com
+    name: 技术支持
+    url: http://example.com/support
+  description: 基于Hyperledger Fabric的汽配供应链溯源管理系统，支持主机厂、零部件厂商、承运商多角色协同
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: 汽配供应链管理系统 API
+  version: "1.0"
+paths:
+  /carrier/order/list:
+    get:
+      consumes:
+      - application/json
+      description: 支持分页查询订单列表，使用bookmark实现翻页
+      parameters:
+      - default: 10
+        description: 每页数量
+        in: query
+        maximum: 100
+        minimum: 1
+        name: pageSize
+        type: integer
+      - description: 分页书签（上次查询返回的bookmark）
+        in: query
+        name: bookmark
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 查询成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/api.OrderListResponse'
+              type: object
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/utils.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: 分页查询订单列表
+      tags:
+      - OEM
+      - Manufacturer
+      - Carrier
+      - Platform
+  /carrier/shipment/{id}:
+    get:
+      consumes:
+      - application/json
+      description: 根据物流单ID查询物流跟踪信息
+      parameters:
+      - description: 物流单ID
+        example: SHIP001
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 查询成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/api.Shipment'
+              type: object
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/utils.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: 查询物流详情
+      tags:
+      - Carrier
+  /carrier/shipment/{id}/location:
+    put:
+      consumes:
+      - application/json
+      description: 承运商上报货物当前位置信息
+      parameters:
+      - description: 物流单ID
+        example: SHIP001
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 位置信息
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.UpdateLocationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 位置更新成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: 请求参数错误
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/utils.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: 更新物流位置
+      tags:
+      - Carrier
+  /carrier/shipment/pickup:
+    post:
+      consumes:
+      - application/json
+      description: 承运商从制造商处取货，创建物流跟踪单
+      parameters:
+      - description: 取货信息
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.PickupGoodsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 取货成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: 请求参数错误
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/utils.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: 取货并生成物流单
+      tags:
+      - Carrier
+  /manufacturer/order/{id}/accept:
+    put:
+      consumes:
+      - application/json
+      description: 零部件厂商接受主机厂发布的订单
+      parameters:
+      - description: 订单ID
+        example: ORDER001
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 订单接受成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/utils.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: 接受订单
+      tags:
+      - Manufacturer
+  /manufacturer/order/{id}/status:
+    put:
+      consumes:
+      - application/json
+      description: 零部件厂商更新订单的生产进度状态
+      parameters:
+      - description: 订单ID
+        example: ORDER001
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 状态信息
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.UpdateStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 状态更新成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: 请求参数错误
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/utils.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: 更新生产状态
+      tags:
+      - Manufacturer
+  /manufacturer/order/list:
+    get:
+      consumes:
+      - application/json
+      description: 支持分页查询订单列表，使用bookmark实现翻页
+      parameters:
+      - default: 10
+        description: 每页数量
+        in: query
+        maximum: 100
+        minimum: 1
+        name: pageSize
+        type: integer
+      - description: 分页书签（上次查询返回的bookmark）
+        in: query
+        name: bookmark
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 查询成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/api.OrderListResponse'
+              type: object
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/utils.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: 分页查询订单列表
+      tags:
+      - OEM
+      - Manufacturer
+      - Carrier
+      - Platform
+  /oem/order/{id}:
+    get:
+      consumes:
+      - application/json
+      description: 根据订单ID查询订单的完整信息
+      parameters:
+      - description: 订单ID
+        example: ORDER001
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 查询成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/api.Order'
+              type: object
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/utils.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: 查询订单详情
+      tags:
+      - OEM
+  /oem/order/{id}/receive:
+    put:
+      consumes:
+      - application/json
+      description: 主机厂确认收到货物，订单完成
+      parameters:
+      - description: 订单ID
+        example: ORDER001
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 签收成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/utils.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: 确认收货
+      tags:
+      - OEM
+  /oem/order/create:
+    post:
+      consumes:
+      - application/json
+      description: 主机厂(OEM)发布零部件采购订单到指定制造商
+      parameters:
+      - description: 订单信息
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.CreateOrderRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 订单创建成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: 请求参数错误
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/utils.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: 创建订单
+      tags:
+      - OEM
+  /oem/order/list:
+    get:
+      consumes:
+      - application/json
+      description: 支持分页查询订单列表，使用bookmark实现翻页
+      parameters:
+      - default: 10
+        description: 每页数量
+        in: query
+        maximum: 100
+        minimum: 1
+        name: pageSize
+        type: integer
+      - description: 分页书签（上次查询返回的bookmark）
+        in: query
+        name: bookmark
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 查询成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/api.OrderListResponse'
+              type: object
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/utils.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: 分页查询订单列表
+      tags:
+      - OEM
+      - Manufacturer
+      - Carrier
+      - Platform
+  /platform/order/list:
+    get:
+      consumes:
+      - application/json
+      description: 支持分页查询订单列表，使用bookmark实现翻页
+      parameters:
+      - default: 10
+        description: 每页数量
+        in: query
+        maximum: 100
+        minimum: 1
+        name: pageSize
+        type: integer
+      - description: 分页书签（上次查询返回的bookmark）
+        in: query
+        name: bookmark
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 查询成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/api.OrderListResponse'
+              type: object
+        "500":
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/utils.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: 分页查询订单列表
+      tags:
+      - OEM
+      - Manufacturer
+      - Carrier
+      - Platform
+securityDefinitions:
+  ApiKeyAuth:
+    description: '组织身份标识 (可选值: org1-OEM, org2-Manufacturer, org3-Carrier/Platform)'
+    in: header
+    name: X-Org-ID
+    type: apiKey
+swagger: "2.0"
+tags:
+- description: 主机厂相关接口 - 创建订单、确认收货、查询订单
+  name: OEM
+- description: 零部件厂商接口 - 接受订单、更新生产状态
+  name: Manufacturer
+- description: 承运商接口 - 取货、更新物流位置、查询物流信息
+  name: Carrier
+- description: 平台监管接口 - 全局订单查询
+  name: Platform
