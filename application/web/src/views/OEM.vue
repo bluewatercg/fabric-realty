@@ -54,7 +54,7 @@
 
     <!-- 创建订单弹窗 -->
     <a-modal
-      v-model:open="showCreateModal"
+      :visible="showCreateModal"
       title="创建采购订单"
       @ok="handleCreateOrder"
       @cancel="resetForm"
@@ -100,7 +100,7 @@
 
     <!-- 订单详情弹窗 -->
     <a-modal
-      v-model:open="showDetailModal"
+      :visible="showDetailModal"
       title="订单详情"
       :footer="null"
       width="600px"

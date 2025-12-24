@@ -55,7 +55,7 @@
 
     <!-- 更新状态弹窗 -->
     <a-modal
-      v-model:open="showStatusModal"
+      :visible="showStatusModal"
       title="更新生产状态"
       @ok="handleUpdateStatus"
       @cancel="showStatusModal = false"
@@ -76,7 +76,7 @@
 
     <!-- 订单详情弹窗 -->
     <a-modal
-      v-model:open="showDetailModal"
+      :visible="showDetailModal"
       title="订单详情"
       :footer="null"
       width="600px"

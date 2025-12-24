@@ -79,7 +79,7 @@
 
     <!-- 订单详情弹窗 -->
     <a-modal
-      v-model:open="showDetailModal"
+      :visible="showDetailModal"
       title="订单详情"
       :footer="null"
       width="700px"
@@ -110,7 +110,7 @@
 
     <!-- 物流详情弹窗 -->
     <a-modal
-      v-model:open="showShipmentModal"
+      :visible="showShipmentModal"
       title="物流详情"
       :footer="null"
     >

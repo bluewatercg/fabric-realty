@@ -62,7 +62,7 @@
 
     <!-- 取货弹窗 -->
     <a-modal
-      v-model:open="showPickup"
+      :visible="showPickup"
       title="取货并生成物流单"
       @ok="handlePickup"
       @cancel="showPickup = false"
@@ -79,7 +79,7 @@
 
     <!-- 更新位置弹窗 -->
     <a-modal
-      v-model:open="showLocation"
+      :visible="showLocation"
       title="更新物流位置"
       @ok="handleUpdateLocation"
       @cancel="showLocation = false"
@@ -96,7 +96,7 @@
 
     <!-- 订单详情弹窗 -->
     <a-modal
-      v-model:open="showDetailModal"
+      :visible="showDetailModal"
       title="订单详情"
       :footer="null"
       width="600px"
@@ -125,7 +125,7 @@
 
     <!-- 物流详情弹窗 -->
     <a-modal
-      v-model:open="showShipmentModal"
+      :visible="showShipmentModal"
       title="物流详情"
       :footer="null"
     >
