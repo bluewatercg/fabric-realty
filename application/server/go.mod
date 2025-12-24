@@ -6,6 +6,7 @@ require (
 	github.com/gin-gonic/gin v1.10.0
 	github.com/hyperledger/fabric-gateway v1.7.0
 	github.com/hyperledger/fabric-protos-go-apiv2 v0.3.4
+	github.com/swaggo/files v0.0.0-20190704085106-630677cd5c14
 	github.com/swaggo/gin-swagger v1.3.0
 	go.etcd.io/bbolt v1.3.11
 	google.golang.org/grpc v1.67.1

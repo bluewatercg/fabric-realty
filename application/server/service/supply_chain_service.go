@@ -6,6 +6,8 @@ import (
     "fmt"
     "strings"
     "time"
+
+    "github.com/hyperledger/fabric-gateway/pkg/client"
 )
 
 type SupplyChainService struct{}
@@ -27,7 +29,7 @@ func isMVCCConflict(errMsg string) bool {
 }
 
 // submitWithRetry 带重试的提交交易
-func submitWithRetry(contract *fabric.Contract, function string, args ...string) ([]byte, error) {
+func submitWithRetry(contract *client.Contract, function string, args ...string) ([]byte, error) {
     var lastErr error
     for i := 0; i < maxRetries; i++ {
         result, err := contract.SubmitTransaction(function, args...)

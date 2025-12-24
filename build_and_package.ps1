@@ -30,7 +30,7 @@ Write-Host "镜像已导出至 $BUILD_DIR 目录。"
 
 Write-Host "=== 5. 打包项目源码 (排除 build 与无关目录) ===" -ForegroundColor Cyan
 # Windows 11 自带 tar 命令
-tar -zcvf "$BUILD_DIR/project.tar.gz" --exclude='node_modules' --exclude='.git' --exclude='temp_mvp1' --exclude="$BUILD_DIR" .
+tar -zcf "$BUILD_DIR/project.tar.gz" --exclude='node_modules' --exclude='.git' --exclude='temp_mvp1' --exclude="$BUILD_DIR" .
 
 Write-Host "`n=== 大功告成！ ===" -ForegroundColor Green
 Write-Host "请将 $BUILD_DIR 目录下的以下三个文件上传到服务器部署："
