@@ -153,3 +153,52 @@ func (s *SupplyChainService) QueryShipment(id string) (map[string]interface{}, e
 
     return shipment, nil
 }
+
+// OrderHistoryRecord 订单历史记录
+type OrderHistoryRecord struct {
+    TxId      string    `json:"txId"`
+    Timestamp time.Time `json:"timestamp"`
+    Status    string    `json:"status"`
+    IsDelete  bool      `json:"isDelete"`
+}
+
+// ShipmentHistoryRecord 物流单历史记录
+type ShipmentHistoryRecord struct {
+    TxId      string    `json:"txId"`
+    Timestamp time.Time `json:"timestamp"`
+    Location  string    `json:"location"`
+    Status    string    `json:"status"`
+    IsDelete  bool      `json:"isDelete"`
+}
+
+// QueryOrderHistory 查询订单历史
+func (s *SupplyChainService) QueryOrderHistory(id string) ([]OrderHistoryRecord, error) {
+    contract := fabric.GetContract(OEM_ORG)
+    result, err := contract.EvaluateTransaction("QueryOrderHistory", id)
+    if err != nil {
+        return nil, fmt.Errorf("查询订单历史失败：%s", fabric.ExtractErrorMessage(err))
+    }
+
+    var history []OrderHistoryRecord
+    if err := json.Unmarshal(result, &history); err != nil {
+        return nil, fmt.Errorf("解析订单历史数据失败：%v", err)
+    }
+
+    return history, nil
+}
+
+// QueryShipmentHistory 查询物流单历史
+func (s *SupplyChainService) QueryShipmentHistory(id string) ([]ShipmentHistoryRecord, error) {
+    contract := fabric.GetContract(CARRIER_ORG)
+    result, err := contract.EvaluateTransaction("QueryShipmentHistory", id)
+    if err != nil {
+        return nil, fmt.Errorf("查询物流历史失败：%s", fabric.ExtractErrorMessage(err))
+    }
+
+    var history []ShipmentHistoryRecord
+    if err := json.Unmarshal(result, &history); err != nil {
+        return nil, fmt.Errorf("解析物流历史数据失败：%v", err)
+    }
+
+    return history, nil
+}

@@ -50,6 +50,7 @@ func main() {
         oemGroup.POST("/order/create", scHandler.CreateOrder)
         oemGroup.PUT("/order/:id/receive", scHandler.ConfirmReceipt)
         oemGroup.GET("/order/:id", scHandler.QueryOrder)
+        oemGroup.GET("/order/:id/history", scHandler.QueryOrderHistory)
         oemGroup.GET("/order/list", scHandler.QueryOrderList)
     }
 
@@ -67,6 +68,7 @@ func main() {
         carrierGroup.POST("/shipment/pickup", scHandler.PickupGoods)
         carrierGroup.PUT("/shipment/:id/location", scHandler.UpdateLocation)
         carrierGroup.GET("/shipment/:id", scHandler.QueryShipment)
+        carrierGroup.GET("/shipment/:id/history", scHandler.QueryShipmentHistory)
         carrierGroup.GET("/order/list", scHandler.QueryOrderList)
     }
 

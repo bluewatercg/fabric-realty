@@ -228,3 +228,43 @@ func (h *SupplyChainHandler) QueryOrderList(c *gin.Context) {
 
     utils.Success(c, result)
 }
+
+// QueryOrderHistory 查询订单历史
+// @Summary 查询订单历史记录
+// @Description 查询订单的完整状态变更历史，展示区块链不可篡改的审计追踪
+// @Tags OEM
+// @Accept json
+// @Produce json
+// @Param id path string true "订单ID"
+// @Success 200 {object} utils.Response
+// @Router /api/oem/order/{id}/history [get]
+func (h *SupplyChainHandler) QueryOrderHistory(c *gin.Context) {
+    id := c.Param("id")
+    history, err := h.scService.QueryOrderHistory(id)
+    if err != nil {
+        log.Printf("QueryOrderHistory Error: %v", err)
+        utils.ServerError(c, err.Error())
+        return
+    }
+    utils.Success(c, history)
+}
+
+// QueryShipmentHistory 查询物流单历史
+// @Summary 查询物流单历史记录
+// @Description 查询物流单的完整位置变更历史
+// @Tags Carrier
+// @Accept json
+// @Produce json
+// @Param id path string true "物流单ID"
+// @Success 200 {object} utils.Response
+// @Router /api/carrier/shipment/{id}/history [get]
+func (h *SupplyChainHandler) QueryShipmentHistory(c *gin.Context) {
+    id := c.Param("id")
+    history, err := h.scService.QueryShipmentHistory(id)
+    if err != nil {
+        log.Printf("QueryShipmentHistory Error: %v", err)
+        utils.ServerError(c, err.Error())
+        return
+    }
+    utils.Success(c, history)
+}
