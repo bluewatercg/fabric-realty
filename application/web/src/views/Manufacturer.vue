@@ -57,6 +57,8 @@
     <a-modal
       :visible="showStatusModal"
       title="更新生产状态"
+      :closable="true"
+      :maskClosable="false"
       @ok="handleUpdateStatus"
       @cancel="showStatusModal = false"
     >

@@ -64,6 +64,8 @@
     <a-modal
       :visible="showPickup"
       title="取货并生成物流单"
+      :closable="true"
+      :maskClosable="false"
       @ok="handlePickup"
       @cancel="showPickup = false"
     >
@@ -81,6 +83,8 @@
     <a-modal
       :visible="showLocation"
       title="更新物流位置"
+      :closable="true"
+      :maskClosable="false"
       @ok="handleUpdateLocation"
       @cancel="showLocation = false"
     >

@@ -56,8 +56,10 @@
     <a-modal
       :visible="showCreateModal"
       title="创建采购订单"
+      :closable="true"
+      :maskClosable="false"
       @ok="handleCreateOrder"
-      @cancel="resetForm"
+      @cancel="showCreateModal = false"
       width="600px"
     >
       <a-form :model="orderForm" layout="vertical">
