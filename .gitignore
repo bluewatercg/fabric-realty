@@ -1,2 +1,8 @@
 .vscode
 .idea"vendor/" 
+application/server/vendor/
+application/web/node_modules/
+application/web/dist/
+build/
+chaincode/vendor
+temp_mvp1/
