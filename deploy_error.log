@@ -1,0 +1,205 @@
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 625B done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/golang:1.23.4-alpine
+#2 ...
+
+#3 [auth] library/golang:pull token for registry-1.docker.io
+#3 DONE 0.0s
+
+#4 [auth] library/alpine:pull token for registry-1.docker.io
+#4 DONE 0.0s
+
+#5 [internal] load metadata for docker.io/library/alpine:3.21
+#5 DONE 7.3s
+
+#2 [internal] load metadata for docker.io/library/golang:1.23.4-alpine
+#2 DONE 7.3s
+
+#6 [internal] load .dockerignore
+#6 transferring context: 2B done
+#6 DONE 0.0s
+
+#7 [stage-1 1/6] FROM docker.io/library/alpine:3.21@sha256:5405e8f36ce1878720f71217d664aa3dea32e5e5df11acbf07fc78ef5661465b
+#7 resolve docker.io/library/alpine:3.21@sha256:5405e8f36ce1878720f71217d664aa3dea32e5e5df11acbf07fc78ef5661465b 0.0s done
+#7 DONE 0.0s
+
+#8 [builder 1/5] FROM docker.io/library/golang:1.23.4-alpine@sha256:c23339199a08b0e12032856908589a6d41a0dab141b8b3b21f156fc571a3f1d3
+#8 resolve docker.io/library/golang:1.23.4-alpine@sha256:c23339199a08b0e12032856908589a6d41a0dab141b8b3b21f156fc571a3f1d3 0.0s done
+#8 DONE 0.0s
+
+#9 [internal] load build context
+#9 transferring context: 183.85kB 0.1s done
+#9 DONE 0.1s
+
+#10 [builder 4/5] RUN go mod vendor
+#10 CACHED
+
+#11 [builder 5/5] RUN CGO_ENABLED=0 go build -mod=vendor -o main
+#11 CACHED
+
+#12 [stage-1 5/6] COPY --from=builder /app/main .
+#12 CACHED
+
+#13 [stage-1 3/6] RUN apk add --no-cache tzdata
+#13 CACHED
+
+#14 [builder 3/5] COPY . .
+#14 CACHED
+
+#15 [stage-1 2/6] RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
+#15 CACHED
+
+#16 [stage-1 4/6] WORKDIR /app
+#16 CACHED
+
+#17 [builder 2/5] WORKDIR /app
+#17 CACHED
+
+#18 [stage-1 6/6] COPY --from=builder /app/config/config-docker.yaml /app/config/config.yaml
+#18 CACHED
+
+#19 exporting to image
+#19 exporting layers done
+#19 exporting manifest sha256:cc0799c56263de880e528658015c6b5bdabf280ceb0113015f934ca1987d8a78 done
+#19 exporting config sha256:5ef377ba126f5fdee67bdbd5a409eac566bc91c214d4553ffb15d16d9f5a2738 done
+#19 exporting attestation manifest sha256:9561f84f29addd11da8896b3a9c25b754ab3dc5d44eebc4a0890af1a7e7ac5ac 0.0s done
+#19 exporting manifest list sha256:fe8ada733cb1551b0d65f1df4af3da731f8f691ff281bdd1b9faa1bcd89141c2 done
+#19 naming to docker.io/togettoyou/fabric-realty.server:latest done
+#19 unpacking to docker.io/togettoyou/fabric-realty.server:latest
+#19 unpacking to docker.io/togettoyou/fabric-realty.server:latest 0.2s done
+#19 DONE 0.3s
+
+ 1 warning found (use docker --debug to expand):
+ - LegacyKeyValueFormat: "ENV key=value" should be used instead of legacy "ENV key value" format (line 3)
+
+View build details: docker-desktop://dashboard/build/desktop-linux/desktop-linux/x5bxs05ugkiv12mmirkqqug55
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 676B done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/nginx:stable-alpine3.20
+#2 ...
+
+#3 [auth] library/node:pull token for registry-1.docker.io
+#3 DONE 0.0s
+
+#4 [internal] load metadata for docker.io/library/node:18.20.0-alpine
+#4 DONE 4.2s
+
+#2 [internal] load metadata for docker.io/library/nginx:stable-alpine3.20
+#2 ...
+
+#5 [auth] library/nginx:pull token for registry-1.docker.io
+#5 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/nginx:stable-alpine3.20
+#2 DONE 5.4s
+
+#6 [internal] load .dockerignore
+#6 transferring context: 2B done
+#6 DONE 0.0s
+
+#7 [web 1/7] FROM docker.io/library/node:18.20.0-alpine@sha256:c698ffe060d198dcc6647be78ea1683363f12d5d507dc5ec9855f1c55966ffdd
+#7 resolve docker.io/library/node:18.20.0-alpine@sha256:c698ffe060d198dcc6647be78ea1683363f12d5d507dc5ec9855f1c55966ffdd 0.0s done
+#7 DONE 0.0s
+
+#8 [stage-1 1/5] FROM docker.io/library/nginx:stable-alpine3.20@sha256:1eadbb07820339e8bbfed18c771691970baee292ec4ab2558f1453d26153e22d
+#8 resolve docker.io/library/nginx:stable-alpine3.20@sha256:1eadbb07820339e8bbfed18c771691970baee292ec4ab2558f1453d26153e22d 0.0s done
+#8 DONE 0.0s
+
+#9 [internal] load build context
+#9 transferring context: 1.86MB 0.6s done
+#9 DONE 0.6s
+
+#10 [web 2/7] RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
+#10 CACHED
+
+#11 [web 3/7] WORKDIR /app
+#11 CACHED
+
+#12 [web 4/7] COPY package*.json ./
+#12 CACHED
+
+#13 [web 5/7] RUN npm config set registry https://registry.npmmirror.com && npm install
+#13 CACHED
+
+#14 [web 6/7] COPY . .
+#14 DONE 5.8s
+
+#15 [web 7/7] RUN npm run build
+#15 0.790 
+#15 0.790 > web@0.0.0 build
+#15 0.790 > vite build
+#15 0.790 
+#15 1.192 vite v4.5.5 building for production...
+#15 1.253 transforming...
+#15 6.916 鉁?2642 modules transformed.
+#15 7.138 rendering chunks...
+#15 7.324 computing gzip size...
+#15 7.347 dist/index.html                          0.47 kB 鈹?gzip:   0.35 kB
+#15 7.347 dist/assets/Carrier-f21e493a.css         0.18 kB 鈹?gzip:   0.14 kB
+#15 7.347 dist/assets/Manufacturer-c3e97b1b.css    0.18 kB 鈹?gzip:   0.15 kB
+#15 7.347 dist/assets/Platform-1d5e640f.css        1.08 kB 鈹?gzip:   0.48 kB
+#15 7.347 dist/assets/Home-33c4dc23.css            1.14 kB 鈹?gzip:   0.45 kB
+#15 7.347 dist/assets/OEM-620cd242.css            19.07 kB 鈹?gzip:   2.78 kB
+#15 7.347 dist/assets/index-ecff7290.css          23.87 kB 鈹?gzip:   3.32 kB
+#15 7.347 dist/assets/index-4e9a1137.css         328.38 kB 鈹?gzip:  38.70 kB
+#15 7.347 dist/assets/index-cf27bb15.css         600.80 kB 鈹?gzip:  69.65 kB
+#15 7.348 dist/assets/Manufacturer-6a11ca28.js     4.84 kB 鈹?gzip:   2.26 kB
+#15 7.348 dist/assets/Carrier-81eeb678.js          6.10 kB 鈹?gzip:   2.43 kB
+#15 7.348 dist/assets/Home-60b86cb0.js             8.62 kB 鈹?gzip:   3.22 kB
+#15 7.348 dist/assets/Platform-9274153c.js        14.14 kB 鈹?gzip:   5.60 kB
+#15 7.348 dist/assets/AntdIcon-24e1376f.js        17.79 kB 鈹?gzip:   6.46 kB
+#15 7.348 dist/assets/OEM-bc070cee.js             22.54 kB 鈹?gzip:   8.30 kB
+#15 7.348 dist/assets/index-463efa97.js           52.90 kB 鈹?gzip:  17.85 kB
+#15 7.348 dist/assets/index-7961cab0.js          100.70 kB 鈹?gzip:  39.58 kB
+#15 7.348 dist/assets/index-6860d4f4.js          569.84 kB 鈹?gzip: 177.65 kB
+#15 7.348 
+#15 7.348 (!) Some chunks are larger than 500 kBs after minification. Consider:
+#15 7.348 - Using dynamic import() to code-split the application
+#15 7.348 - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+#15 7.348 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+#15 7.349 鉁?built in 6.16s
+#15 DONE 7.4s
+
+#16 [stage-1 2/5] RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
+#16 CACHED
+
+#17 [stage-1 3/5] RUN apk add --no-cache tzdata
+#17 CACHED
+
+#18 [stage-1 4/5] COPY --from=web /app/dist /usr/share/nginx/html
+#18 DONE 0.0s
+
+#19 [stage-1 5/5] COPY default.conf /etc/nginx/conf.d/
+#19 DONE 0.0s
+
+#20 exporting to image
+#20 exporting layers 0.1s done
+#20 exporting manifest sha256:b5d497f93c22a5e6bd82283f32435ea3d1e827f0b891360c7ea1b156994f2ec3 done
+#20 exporting config sha256:ea9debbd0ea2820915f1c2772bf62f6ecbef329e0ab450bbda2ed08a806328c8 done
+#20 exporting attestation manifest sha256:b007dc362eb42f87045e1297d0eee9a2beb2a60ed9730abb78ac2d273a0f4677 0.0s done
+#20 exporting manifest list sha256:4250cfa71365f30a18633cbefa781259c327472e153501d8556fa8652cfa5c68 done
+#20 naming to docker.io/togettoyou/fabric-realty.web:latest done
+#20 unpacking to docker.io/togettoyou/fabric-realty.web:latest 0.0s done
+#20 DONE 0.2s
+
+View build details: docker-desktop://dashboard/build/desktop-linux/desktop-linux/w7mfzqjxo6azu0qtw8papyrbb
+a .
+a ./.github
+a ./.gitignore
+a ./application
+a ./build_and_package.ps1
+a ./chaincode
+a ./chaincode_implementation_plan.md
+a ./commit_fix.sh
+a ./deploy_error.logtar.exe: (null)
+Warning: Permanently added '192.168.1.41' (ED25519) to the list of known hosts.
+Warning: Permanently added '192.168.1.41' (ED25519) to the list of known hosts.
+dos2unix: 姝ｅ湪杞崲鏂囦欢 ./remote_install.sh 涓篣nix鏍煎紡...

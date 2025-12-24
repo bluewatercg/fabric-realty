@@ -11,32 +11,16 @@
         <!-- 统计卡片 -->
         <a-row :gutter="16" style="margin-bottom: 24px">
           <a-col :span="6">
-            <a-statistic
-              title="总订单数"
-              :value="stats.total"
-              :value-style="{ color: '#1890ff' }"
-            />
+            <a-statistic title="总订单数" :value="stats.total" value-style="{ color: '#1890ff' }" />
           </a-col>
           <a-col :span="6">
-            <a-statistic
-              title="进行中"
-              :value="stats.inProgress"
-              :value-style="{ color: '#faad14' }"
-            />
+            <a-statistic title="进行中" :value="stats.inProgress" value-style="{ color: '#faad14' }" />
           </a-col>
           <a-col :span="6">
-            <a-statistic
-              title="运输中"
-              :value="stats.shipping"
-              :value-style="{ color: '#722ed1' }"
-            />
+            <a-statistic title="运输中" :value="stats.shipping" value-style="{ color: '#722ed1' }" />
           </a-col>
           <a-col :span="6">
-            <a-statistic
-              title="已完成"
-              :value="stats.completed"
-              :value-style="{ color: '#52c41a' }"
-            />
+            <a-statistic title="已完成" :value="stats.completed" value-style="{ color: '#52c41a' }" />
           </a-col>
         </a-row>
 
@@ -46,6 +30,7 @@
           :data-source="orders"
           :pagination="false"
           row-key="id"
+          :scroll="{ x: 1000 }"
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'status'">
@@ -62,6 +47,7 @@
                 <a-button
                   v-if="record.shipmentId"
                   size="small"
+                  type="link"
                   @click="viewShipment(record.shipmentId)"
                 >
                   查看物流
@@ -71,22 +57,23 @@
           </template>
         </a-table>
 
-        <div class="pagination" v-if="orders.length > 0">
-          <a-button @click="loadOrders()" :disabled="!bookmark">加载更多</a-button>
+        <!-- 加载更多 -->
+        <div class="pagination" v-if="bookmark">
+          <a-button @click="loadOrders" :loading="loading">加载更多</a-button>
+        </div>
+        <div class="pagination" v-else-if="orders.length > 0">
+          <span style="color: #999">已加载全部订单</span>
         </div>
       </a-card>
     </div>
 
     <!-- 订单详情弹窗 -->
     <a-modal
-      :visible="showDetailModal"
+      v-model:visible="showDetailModal"
       title="订单详情"
-      :footer="null"
-      :closable="true"
-      @cancel="showDetailModal = false"
-      width="700px"
+      width="800px"
     >
-      <a-descriptions bordered v-if="selectedOrder" :column="2">
+      <a-descriptions bordered :column="2" v-if="selectedOrder">
         <a-descriptions-item label="订单ID">{{ selectedOrder.id }}</a-descriptions-item>
         <a-descriptions-item label="状态">
           <a-tag :color="getStatusColor(selectedOrder.status)">
@@ -105,40 +92,38 @@
             :data-source="selectedOrder.items"
             :pagination="false"
             size="small"
+            row-key="name"
           />
         </a-descriptions-item>
       </a-descriptions>
-      <div style="text-align: right; margin-top: 24px;">
-        <a-button key="history" type="primary" @click="viewHistory(selectedOrder!.id)">查看历史记录</a-button>
-      </div>
+      <template #footer>
+        <a-button type="primary" @click="viewHistory(selectedOrder!.id)">查看历史记录</a-button>
+      </template>
     </a-modal>
 
     <!-- 物流详情弹窗 -->
     <a-modal
-      :visible="showShipmentModal"
+      v-model:visible="showShipmentModal"
       title="物流详情"
       :footer="null"
-      :closable="true"
-      @cancel="showShipmentModal = false"
+      width="600px"
     >
       <a-descriptions bordered v-if="currentShipment">
         <a-descriptions-item label="物流单ID">{{ currentShipment.id }}</a-descriptions-item>
         <a-descriptions-item label="订单ID">{{ currentShipment.orderId }}</a-descriptions-item>
         <a-descriptions-item label="承运商ID">{{ currentShipment.carrierId }}</a-descriptions-item>
-        <a-descriptions-item label="当前位置">{{ currentShipment.location }}</a-descriptions-item>
+        <a-descriptions-item label="当前位置">{{ currentShipment.location || '未知' }}</a-descriptions-item>
         <a-descriptions-item label="状态">{{ currentShipment.status }}</a-descriptions-item>
         <a-descriptions-item label="更新时间">{{ currentShipment.updateTime }}</a-descriptions-item>
       </a-descriptions>
     </a-modal>
 
-    <!-- 订单历史弹窗 -->
+    <!-- 订单历史记录弹窗（审计追踪） -->
     <a-modal
-      :visible="showHistoryModal"
-      title="订单历史记录"
+      v-model:visible="showHistoryModal"
+      title="订单历史记录 (链上审计追踪)"
       :footer="null"
-      :closable="true"
-      @cancel="showHistoryModal = false"
-      width="900px"
+      width="1000px"
     >
       <a-table
         :columns="historyColumns"
@@ -146,18 +131,27 @@
         :loading="historyLoading"
         row-key="txId"
         size="small"
+        :expanded-row-keys="expandedRowKeys"
+        @expand="handleExpand"
       >
+        <template #expandedRowRender="{ record }">
+          <div style="margin: 0; background: #fafafa; padding: 16px; border-radius: 4px;">
+            <p style="margin: 0 0 8px 0;"><strong>账本完整状态数据:</strong></p>
+            <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px;">{{ JSON.stringify(record.value, null, 2) }}</pre>
+          </div>
+        </template>
         <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'isDelete'">
-              <a-tag :color="record.isDelete ? 'red' : 'green'">
-                {{ record.isDelete ? '删除' : '更新/创建' }}
-              </a-tag>
-            </template>
-            <template v-if="column.key === 'status'">
-              <a-tag :color="getStatusColor(record.status)">
-                {{ getStatusText(record.status) }}
-              </a-tag>
-            </template>
+          <template v-if="column.key === 'isDelete'">
+            <a-tag :color="record.isDelete ? 'red' : 'green'">
+              {{ record.isDelete ? '删除' : '更新/创建' }}
+            </a-tag>
+          </template>
+          <template v-else-if="column.key === 'status'">
+            <a-tag v-if="record.isDelete" color="red">已删除</a-tag>
+            <a-tag v-else :color="getStatusColor(record.value?.status)">
+              {{ getStatusText(record.value?.status) || '--' }}
+            </a-tag>
+          </template>
         </template>
       </a-table>
     </a-modal>
@@ -172,91 +166,76 @@ import type { Order, Shipment } from '../types';
 
 const loading = ref(false);
 const orders = ref<Order[]>([]);
-const bookmark = ref('');
+const bookmark = ref<string | undefined>('');
 const showDetailModal = ref(false);
 const showShipmentModal = ref(false);
+const showHistoryModal = ref(false);
 const selectedOrder = ref<Order | null>(null);
 const currentShipment = ref<Shipment | null>(null);
-
-const showHistoryModal = ref(false);
 const historyLoading = ref(false);
 const orderHistory = ref<any[]>([]);
+const expandedRowKeys = ref<string[]>([]);
 
 const columns = [
-  { title: '订单ID', dataIndex: 'id', key: 'id', width: 120 },
+  { title: '订单ID', dataIndex: 'id', key: 'id', width: 140, fixed: 'left' },
   { title: '主机厂', dataIndex: 'oemId', key: 'oemId', width: 100 },
   { title: '厂商', dataIndex: 'manufacturerId', key: 'manufacturerId', width: 100 },
   { title: '状态', key: 'status', width: 100 },
-  { title: '总价', key: 'totalPrice', width: 100 },
-  { title: '物流单ID', dataIndex: 'shipmentId', key: 'shipmentId', width: 120 },
+  { title: '总价', key: 'totalPrice', width: 110 },
+  { title: '物流单ID', dataIndex: 'shipmentId', key: 'shipmentId', width: 140 },
   { title: '创建时间', dataIndex: 'createTime', key: 'createTime', width: 180 },
-  { title: '操作', key: 'action', width: 180 }
+  { title: '操作', key: 'action', width: 180, fixed: 'right' },
 ];
 
 const itemColumns = [
   { title: '零件名称', dataIndex: 'name', key: 'name' },
-  { title: '数量', dataIndex: 'quantity', key: 'quantity' },
-  { title: '单价', dataIndex: 'price', key: 'price' }
+  { title: '数量', dataIndex: 'quantity', key: 'quantity', width: 80 },
+  { title: '单价', dataIndex: 'price', key: 'price', width: 100 },
 ];
 
 const historyColumns = [
-  { title: '交易ID', dataIndex: 'txId', key: 'txId', ellipsis: true },
-  { title: '时间戳', dataIndex: 'timestamp', key: 'timestamp', width: 200 },
-  { title: '状态', dataIndex: ['value', 'status'], key: 'status', width: 120 },
-  { title: '操作类型', dataIndex: 'isDelete', key: 'isDelete', width: 120 },
+  { title: '交易ID', dataIndex: 'txId', key: 'txId', ellipsis: true, width: 200 },
+  { title: '时间戳', dataIndex: 'timestamp', key: 'timestamp', width: 180 },
+  { title: '状态', key: 'status', width: 120 },
+  { title: '操作类型', key: 'isDelete', width: 100 },
 ];
 
-// 计算统计数据
+// 统计数据
 const stats = computed(() => {
-  const total = orders.value.length;
-  const inProgress = orders.value.filter(o => 
-    ['CREATED', 'ACCEPTED', 'PRODUCING', 'PRODUCED', 'READY'].includes(o.status)
-  ).length;
-  const shipping = orders.value.filter(o => 
-    ['SHIPPED', 'DELIVERED'].includes(o.status)
-  ).length;
-  const completed = orders.value.filter(o => o.status === 'RECEIVED').length;
-
+  const list = orders.value;
+  const total = list.length;
+  const inProgress = list.filter(o => ['CREATED', 'ACCEPTED', 'PRODUCING', 'PRODUCED', 'READY'].includes(o.status)).length;
+  const shipping = list.filter(o => ['SHIPPED', 'DELIVERED'].includes(o.status)).length;
+  const completed = list.filter(o => o.status === 'RECEIVED').length;
   return { total, inProgress, shipping, completed };
 });
 
-const getStatusColor = (status: string) => {
-  const colorMap: Record<string, string> = {
-    CREATED: 'blue',
-    ACCEPTED: 'cyan',
-    PRODUCING: 'orange',
-    PRODUCED: 'purple',
-    READY: 'geekblue',
-    SHIPPED: 'gold',
-    DELIVERED: 'lime',
-    RECEIVED: 'green'
-  };
-  return colorMap[status] || 'default';
+// 状态映射
+const statusMap = {
+  CREATED: { text: '已创建', color: 'blue' },
+  ACCEPTED: { text: '已接受', color: 'cyan' },
+  PRODUCING: { text: '生产中', color: 'orange' },
+  PRODUCED: { text: '已生产', color: 'purple' },
+  READY: { text: '待取货', color: 'geekblue' },
+  SHIPPED: { text: '运输中', color: 'gold' },
+  DELIVERED: { text: '已送达', color: 'lime' },
+  RECEIVED: { text: '已签收', color: 'green' },
 };
 
-const getStatusText = (status: string) => {
-  const textMap: Record<string, string> = {
-    CREATED: '已创建',
-    ACCEPTED: '已接受',
-    PRODUCING: '生产中',
-    PRODUCED: '已生产',
-    READY: '待取货',
-    SHIPPED: '运输中',
-    DELIVERED: '已送达',
-    RECEIVED: '已签收'
-  };
-  return textMap[status] || status;
-};
+const getStatusText = (status: string) => statusMap[status]?.text || status;
+const getStatusColor = (status: string) => statusMap[status]?.color || 'default';
 
+// 加载订单
 const loadOrders = async () => {
+  if (loading.value) return;
   loading.value = true;
   try {
     const result = await supplyChainApi.getOrderList(
-      { pageSize: 10, bookmark: bookmark.value },
+      { pageSize: 10, bookmark: bookmark.value || undefined },
       'PLATFORM'
     );
     orders.value.push(...result.records);
-    bookmark.value = result.bookmark;
+    bookmark.value = result.bookmark || '';
   } catch (error: any) {
     message.error('加载订单失败: ' + (error.message || '未知错误'));
   } finally {
@@ -264,11 +243,13 @@ const loadOrders = async () => {
   }
 };
 
+// 查看订单详情
 const viewOrder = (order: Order) => {
   selectedOrder.value = order;
   showDetailModal.value = true;
 };
 
+// 查看物流
 const viewShipment = async (shipmentId: string) => {
   try {
     currentShipment.value = await supplyChainApi.getShipment(shipmentId);
@@ -278,21 +259,30 @@ const viewShipment = async (shipmentId: string) => {
   }
 };
 
+// 查看历史记录
 const viewHistory = async (orderId: string) => {
   historyLoading.value = true;
   showHistoryModal.value = true;
   try {
-    // 从链码返回的记录中，status 在 value 对象里
     const rawHistory = await supplyChainApi.getOrderHistory(orderId);
     orderHistory.value = rawHistory.map(rec => ({
       ...rec,
       status: rec.value?.status || ''
     }));
+    expandedRowKeys.value = []; // 默认不展开
   } catch (error: any) {
     message.error('加载历史记录失败: ' + (error.message || '未知错误'));
-    showHistoryModal.value = false; // Close modal on error
+    showHistoryModal.value = false;
   } finally {
     historyLoading.value = false;
+  }
+};
+
+const handleExpand = (expanded: boolean, record: any) => {
+  if (expanded) {
+    expandedRowKeys.value = [record.txId];
+  } else {
+    expandedRowKeys.value = [];
   }
 };
 
@@ -306,13 +296,20 @@ onMounted(() => {
   min-height: 100vh;
   background-color: #f0f2f5;
 }
-
 .content {
   padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
 }
-
 .pagination {
-  margin-top: 16px;
+  margin-top: 24px;
   text-align: center;
+}
+pre {
+  background-color: #f5f5f5;
+  padding: 12px;
+  border-radius: 4px;
+  overflow-x: auto;
+  font-size: 13px;
 }
 </style>
