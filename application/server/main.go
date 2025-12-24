@@ -9,7 +9,6 @@ import (
 
     "github.com/gin-gonic/gin"
     swaggerFiles "github.com/swaggo/gin-swagger"
-    "github.com/swaggo/gin-swagger/assets"
 )
 
 // @title 供应链协同系统 API 文档
@@ -34,10 +33,7 @@ func main() {
     r := gin.Default()
 
     // Swagger 路由
-    r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.NewHandler(
-        ginSwagger.InstanceName("swagger"),
-        ginSwagger.PathPrefix("/swagger"),
-    )))
+    r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.NewHandler()))
 
     apiGroup := r.Group("/api")
 
