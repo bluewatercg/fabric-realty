@@ -3,6 +3,18 @@
 # 设置错误即停止
 set -e
 
+echo "=== 0. 检查上传路径 ==="
+# 检查是否上传到了 build 目录，如果是则将文件移动到当前目录
+if [ -d "build" ]; then
+    if [ -f "build/project.tar.gz" ] || [ -f "build/server_image.tar" ] || [ -f "build/web_image.tar" ]; then
+        echo "检测到文件在 build 目录，正在移动到当前目录..."
+        mv build/project.tar.gz . 2>/dev/null || true
+        mv build/server_image.tar . 2>/dev/null || true
+        mv build/web_image.tar . 2>/dev/null || true
+        echo "文件移动完成。"
+    fi
+fi
+
 echo "=== 1. 准备项目源码 ==="
 # 优先检查是否已是 Git 仓库
 if [ -d ".git" ]; then

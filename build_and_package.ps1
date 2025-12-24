@@ -26,7 +26,9 @@ Pop-Location
 Write-Host "=== 4. 导出镜像为 .tar 文件 ===" -ForegroundColor Cyan
 docker save -o "$BUILD_DIR/server_image.tar" $SERVER_IMAGE
 docker save -o "$BUILD_DIR/web_image.tar" $WEB_IMAGE
-Write-Host "镜像已导出至 $BUILD_DIR 目录。"
+# 复制远程安装脚本到 build 目录，方便用户直接上传整个 build 文件夹
+Copy-Item "remote_install.sh" -Destination "$BUILD_DIR/"
+Write-Host "镜像与安装脚本已导出至 $BUILD_DIR 目录。"
 
 Write-Host "=== 5. 打包项目源码 (排除 build 与无关目录) ===" -ForegroundColor Cyan
 # Windows 11 自带 tar 命令
