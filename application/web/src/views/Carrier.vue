@@ -106,7 +106,7 @@
       title="订单详情"
       :footer="null"
       :closable="true"
-      @close="showDetailModal = false"
+      @cancel="showDetailModal = false"
       width="600px"
     >
       <a-descriptions bordered v-if="selectedOrder">
@@ -137,7 +137,7 @@
       title="物流详情"
       :footer="null"
       :closable="true"
-      @close="showShipmentModal = false"
+      @cancel="showShipmentModal = false"
     >
       <a-descriptions bordered v-if="currentShipment">
         <a-descriptions-item label="物流单ID">{{ currentShipment.id }}</a-descriptions-item>

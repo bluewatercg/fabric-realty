@@ -107,7 +107,7 @@
       title="订单详情"
       :footer="null"
       :closable="true"
-      @close="showDetailModal = false"
+      @cancel="showDetailModal = false"
       width="600px"
     >
       <a-descriptions bordered v-if="selectedOrder">

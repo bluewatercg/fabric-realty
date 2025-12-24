@@ -83,7 +83,7 @@
       title="订单详情"
       :footer="null"
       :closable="true"
-      @close="showDetailModal = false"
+      @cancel="showDetailModal = false"
       width="700px"
     >
       <a-descriptions bordered v-if="selectedOrder" :column="2">
@@ -108,6 +108,9 @@
           />
         </a-descriptions-item>
       </a-descriptions>
+      <div style="text-align: right; margin-top: 24px;">
+        <a-button key="history" type="primary" @click="viewHistory(selectedOrder!.id)">查看历史记录</a-button>
+      </div>
     </a-modal>
 
     <!-- 物流详情弹窗 -->
@@ -116,7 +119,7 @@
       title="物流详情"
       :footer="null"
       :closable="true"
-      @close="showShipmentModal = false"
+      @cancel="showShipmentModal = false"
     >
       <a-descriptions bordered v-if="currentShipment">
         <a-descriptions-item label="物流单ID">{{ currentShipment.id }}</a-descriptions-item>
@@ -126,6 +129,37 @@
         <a-descriptions-item label="状态">{{ currentShipment.status }}</a-descriptions-item>
         <a-descriptions-item label="更新时间">{{ currentShipment.updateTime }}</a-descriptions-item>
       </a-descriptions>
+    </a-modal>
+
+    <!-- 订单历史弹窗 -->
+    <a-modal
+      :visible="showHistoryModal"
+      title="订单历史记录"
+      :footer="null"
+      :closable="true"
+      @cancel="showHistoryModal = false"
+      width="900px"
+    >
+      <a-table
+        :columns="historyColumns"
+        :data-source="orderHistory"
+        :loading="historyLoading"
+        row-key="txId"
+        size="small"
+      >
+        <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'isDelete'">
+              <a-tag :color="record.isDelete ? 'red' : 'green'">
+                {{ record.isDelete ? '删除' : '更新/创建' }}
+              </a-tag>
+            </template>
+            <template v-if="column.key === 'status'">
+              <a-tag :color="getStatusColor(record.status)">
+                {{ getStatusText(record.status) }}
+              </a-tag>
+            </template>
+        </template>
+      </a-table>
     </a-modal>
   </div>
 </template>
@@ -144,6 +178,10 @@ const showShipmentModal = ref(false);
 const selectedOrder = ref<Order | null>(null);
 const currentShipment = ref<Shipment | null>(null);
 
+const showHistoryModal = ref(false);
+const historyLoading = ref(false);
+const orderHistory = ref<any[]>([]);
+
 const columns = [
   { title: '订单ID', dataIndex: 'id', key: 'id', width: 120 },
   { title: '主机厂', dataIndex: 'oemId', key: 'oemId', width: 100 },
@@ -159,6 +197,13 @@ const itemColumns = [
   { title: '零件名称', dataIndex: 'name', key: 'name' },
   { title: '数量', dataIndex: 'quantity', key: 'quantity' },
   { title: '单价', dataIndex: 'price', key: 'price' }
+];
+
+const historyColumns = [
+  { title: '交易ID', dataIndex: 'txId', key: 'txId', ellipsis: true },
+  { title: '时间戳', dataIndex: 'timestamp', key: 'timestamp', width: 200 },
+  { title: '状态', dataIndex: ['value', 'status'], key: 'status', width: 120 },
+  { title: '操作类型', dataIndex: 'isDelete', key: 'isDelete', width: 120 },
 ];
 
 // 计算统计数据
@@ -230,6 +275,24 @@ const viewShipment = async (shipmentId: string) => {
     showShipmentModal.value = true;
   } catch (error: any) {
     message.error('查询物流失败: ' + (error.message || '未知错误'));
+  }
+};
+
+const viewHistory = async (orderId: string) => {
+  historyLoading.value = true;
+  showHistoryModal.value = true;
+  try {
+    // 从链码返回的记录中，status 在 value 对象里
+    const rawHistory = await supplyChainApi.getOrderHistory(orderId);
+    orderHistory.value = rawHistory.map(rec => ({
+      ...rec,
+      status: rec.value?.status || ''
+    }));
+  } catch (error: any) {
+    message.error('加载历史记录失败: ' + (error.message || '未知错误'));
+    showHistoryModal.value = false; // Close modal on error
+  } finally {
+    historyLoading.value = false;
   }
 };
 

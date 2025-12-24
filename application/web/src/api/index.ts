@@ -38,5 +38,8 @@ export const supplyChainApi = {
   },
 
   getShipment: (id: string) =>
-    request.get<never, any>(`/carrier/shipment/${id}`)
+    request.get<never, any>(`/carrier/shipment/${id}`),
+
+  getOrderHistory: (id: string) =>
+    request.get<never, any[]>(`/oem/order/${id}/history`)
 };

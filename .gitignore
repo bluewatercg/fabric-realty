@@ -6,3 +6,4 @@ application/web/dist/
 build/
 chaincode/vendor
 temp_mvp1/
+/*.gz
