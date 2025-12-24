@@ -3,7 +3,8 @@ FROM golang:1.23.4-alpine AS builder
 ENV GOPROXY https://goproxy.cn,direct
 WORKDIR /app
 COPY . .
-RUN CGO_ENABLED=0 go build -mod=mod -o main
+# 使用 vendor 模式，避免构建时下载依赖导致网络问题
+RUN CGO_ENABLED=0 go build -mod=vendor -o main
 
 FROM alpine:3.21
 # 使用阿里云镜像源
