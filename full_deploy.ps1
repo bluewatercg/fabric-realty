@@ -23,8 +23,8 @@ Write-Host "提示：传输完成后，文件将存放在 ${REMOTE_PATH}" -Foreg
 
 # 只进行传输和解压，不再调用远程脚本进行安装
 # 将整个管道的错误流重定向到日志文件
-(tar -c build/server_image.tar build/web_image.tar build/project.tar.gz remote_install.sh | `
-ssh "${REMOTE_USER}@${REMOTE_IP}" "mkdir -p ${REMOTE_PATH} && tar -x -C ${REMOTE_PATH} && dos2unix ${REMOTE_PATH}/remote_install.sh && chmod +x ${REMOTE_PATH}/remote_install.sh") 2>> $logFile
+(tar -zc --transform='s/^build\///S' build/server_image.tar build/web_image.tar build/project.tar.gz remote_install.sh | `
+ssh "${REMOTE_USER}@${REMOTE_IP}" "mkdir -p ${REMOTE_PATH} && tar -zx -C ${REMOTE_PATH} && dos2unix ${REMOTE_PATH}/remote_install.sh && chmod +x ${REMOTE_PATH}/remote_install.sh") 2>> $logFile
 
 Write-Host "`n✅ 构建与上传完成！" -ForegroundColor Green
 Write-Host "请现在登录服务器执行: cd ${REMOTE_PATH} && ./remote_install.sh"

@@ -411,17 +411,13 @@ func (s *SmartContract) QueryOrderHistory(ctx contractapi.TransactionContextInte
         }
 
         var order Order
-        var isDelete bool
         if queryResponse.Value != nil {
             if err := json.Unmarshal(queryResponse.Value, &order); err == nil {
                 // 正常解析
             }
         }
 
-        txTimestamp, err := queryResponse.Timestamp.Timestamp()
-        if err != nil {
-            txTimestamp = time.Now()
-        }
+        txTimestamp := queryResponse.Timestamp.AsTime()
 
         history = append(history, OrderHistoryRecord{
             TxId:      queryResponse.TxId,
@@ -457,10 +453,7 @@ func (s *SmartContract) QueryShipmentHistory(ctx contractapi.TransactionContextI
             }
         }
 
-        txTimestamp, err := queryResponse.Timestamp.Timestamp()
-        if err != nil {
-            txTimestamp = time.Now()
-        }
+        txTimestamp := queryResponse.Timestamp.AsTime()
 
         history = append(history, ShipmentHistoryRecord{
             TxId:      queryResponse.TxId,

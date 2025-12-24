@@ -8,9 +8,7 @@ networks:
 services:
   # 后端 - 本地构建
   fabric-realty.server:
-    build:
-      context: ./server
-      dockerfile: Dockerfile
+    image: togettoyou/fabric-realty.server:latest
     container_name: fabric-realty.server
     volumes:
       - /usr/share/zoneinfo/Asia/Shanghai:/usr/share/zoneinfo/Asia/Shanghai
@@ -25,9 +23,7 @@ services:
 
   # 前端
   fabric-realty.web:
-    build:
-      context: ./web
-      dockerfile: Dockerfile
+    image: togettoyou/fabric-realty.web:latest
     container_name: fabric-realty.web
     ports:
       - "8000:80"
