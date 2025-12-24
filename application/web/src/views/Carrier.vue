@@ -68,6 +68,7 @@
       :maskClosable="false"
       @ok="handlePickup"
       @cancel="showPickup = false"
+      @close="showPickup = false"
     >
       <a-form layout="vertical">
         <a-form-item label="订单ID">
@@ -87,6 +88,7 @@
       :maskClosable="false"
       @ok="handleUpdateLocation"
       @cancel="showLocation = false"
+      @close="showLocation = false"
     >
       <a-form layout="vertical">
         <a-form-item label="物流单ID">
@@ -103,6 +105,8 @@
       :visible="showDetailModal"
       title="订单详情"
       :footer="null"
+      :closable="true"
+      @close="showDetailModal = false"
       width="600px"
     >
       <a-descriptions bordered v-if="selectedOrder">
@@ -132,6 +136,8 @@
       :visible="showShipmentModal"
       title="物流详情"
       :footer="null"
+      :closable="true"
+      @close="showShipmentModal = false"
     >
       <a-descriptions bordered v-if="currentShipment">
         <a-descriptions-item label="物流单ID">{{ currentShipment.id }}</a-descriptions-item>

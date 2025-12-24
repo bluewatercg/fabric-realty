@@ -60,6 +60,7 @@
       :maskClosable="false"
       @ok="handleCreateOrder"
       @cancel="showCreateModal = false"
+      @close="showCreateModal = false"
       width="600px"
     >
       <a-form :model="orderForm" layout="vertical">
@@ -105,6 +106,8 @@
       :visible="showDetailModal"
       title="订单详情"
       :footer="null"
+      :closable="true"
+      @close="showDetailModal = false"
       width="600px"
     >
       <a-descriptions bordered v-if="selectedOrder">

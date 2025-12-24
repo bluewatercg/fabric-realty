@@ -61,6 +61,7 @@
       :maskClosable="false"
       @ok="handleUpdateStatus"
       @cancel="showStatusModal = false"
+      @close="showStatusModal = false"
     >
       <a-form layout="vertical">
         <a-form-item label="当前订单ID">
@@ -81,6 +82,8 @@
       :visible="showDetailModal"
       title="订单详情"
       :footer="null"
+      :closable="true"
+      @close="showDetailModal = false"
       width="600px"
     >
       <a-descriptions bordered v-if="selectedOrder">
