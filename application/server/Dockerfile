@@ -1,4 +1,5 @@
-FROM golang:1.23-alpine AS builder
+# 使用指定版本号确保构建一致性
+FROM golang:1.23.4-alpine AS builder
 ENV GOPROXY https://goproxy.cn,direct
 WORKDIR /app
 COPY . .

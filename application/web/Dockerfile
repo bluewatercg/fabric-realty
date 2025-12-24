@@ -1,4 +1,5 @@
-FROM node:16.17.1-alpine AS web
+# 使用指定版本号确保构建一致性
+FROM node:18.20.0-alpine AS web
 # 使用阿里云镜像源
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
 WORKDIR /app
