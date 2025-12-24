@@ -3,13 +3,43 @@
 # 设置错误即停止
 set -e
 
-echo "=== 1. 解压项目源码 ==="
-if [ -f "project.tar.gz" ]; then
-    tar -zxvf project.tar.gz
-    echo "源码解压完成。"
+echo "=== 1. 准备项目源码 ==="
+# 优先检查是否已是 Git 仓库
+if [ -d ".git" ]; then
+    echo "检测到 Git 仓库，正在拉取最新代码..."
+    git pull
+    echo "代码拉取完成。"
+# 其次检查是否有压缩包
+elif [ -f "project.tar.gz" ]; then
+    echo "正在解压 project.tar.gz..."
+    if tar -zxvf project.tar.gz; then
+        echo "源码解压完成。"
+    else
+        echo "错误: project.tar.gz 解压失败，文件可能不完整或损坏 (unexpected end of file)。"
+        if command -v git &> /dev/null; then
+            echo "尝试通过 Git 重新拉取代码..."
+            git init
+            git remote add origin https://github.com/bluewatercg/fabric-realty.git || true
+            git fetch origin
+            git reset --hard origin/main
+            echo "代码通过 Git 修复完成。"
+        else
+            exit 1
+        fi
+    fi
+# 如果都没有，尝试直接克隆
 else
-    echo "错误: 未找到 project.tar.gz，请确保文件已上传到当前目录。"
-    exit 1
+    if command -v git &> /dev/null; then
+        echo "未找到源码且未发现压缩包，正在通过 Git 克隆最新代码..."
+        git init
+        git remote add origin https://github.com/bluewatercg/fabric-realty.git || true
+        git fetch origin
+        git reset --hard origin/main
+        echo "代码克隆完成。"
+    else
+        echo "错误: 未找到 .git 目录且未找到 project.tar.gz，且系统未安装 git。"
+        exit 1
+    fi
 fi
 
 echo "=== 2. 加载 Docker 镜像 ==="
