@@ -43,6 +43,14 @@
                   更新位置
                 </a-button>
                 <a-button
+                  v-if="record.status === 'SHIPPED'"
+                  type="primary"
+                  size="small"
+                  @click="confirmDeliver(record.id)"
+                >
+                  确认送达
+                </a-button>
+                <a-button
                   v-if="record.shipmentId"
                   size="small"
                   @click="viewShipment(record.shipmentId)"
@@ -273,6 +281,18 @@ const handleUpdateLocation = async () => {
     showLocation.value = false;
   } catch (error: any) {
     message.error('更新位置失败: ' + (error.message || '未知错误'));
+  }
+};
+
+const confirmDeliver = async (orderId: string) => {
+  try {
+    await supplyChainApi.deliverGoods(orderId);
+    message.success('已确认送达');
+    orders.value = [];
+    bookmark.value = '';
+    await loadOrders();
+  } catch (error: any) {
+    message.error('确认送达失败: ' + (error.message || '未知错误'));
   }
 };
 

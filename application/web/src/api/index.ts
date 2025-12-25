@@ -20,6 +20,9 @@ export const supplyChainApi = {
   pickupGoods: (data: { orderId: string; shipmentId: string }) =>
     request.post<never, void>('/carrier/shipment/pickup', data),
 
+  deliverGoods: (orderId: string) =>
+    request.put<never, void>(`/carrier/order/${orderId}/deliver`),
+
   updateLocation: (id: string, location: string) =>
     request.put<never, void>(`/carrier/shipment/${id}/location`, { location }),
 

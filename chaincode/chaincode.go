@@ -304,6 +304,45 @@ func (s *SmartContract) UpdateLocation(ctx contractapi.TransactionContextInterfa
     return ctx.GetStub().PutState(shipmentId, newShipmentBytes)
 }
 
+// DeliverGoods 承运商送达货物 (仅 Org3 可调用)
+func (s *SmartContract) DeliverGoods(ctx contractapi.TransactionContextInterface, orderId string) error {
+    clientMSPID, err := s.getClientIdentityMSPID(ctx)
+    if err != nil {
+        return err
+    }
+    if clientMSPID != PLATFORM_ORG_MSPID {
+        return fmt.Errorf("无权限: 仅限承运商操作")
+    }
+
+    orderBytes, err := ctx.GetStub().GetState(orderId)
+    if err != nil || orderBytes == nil {
+        return fmt.Errorf("订单 %s 不存在", orderId)
+    }
+
+    var order Order
+    if err := json.Unmarshal(orderBytes, &order); err != nil {
+        return fmt.Errorf("解析订单失败: %v", err)
+    }
+
+    // 状态校验：只有 SHIPPED 状态才能送达
+    if order.Status != ORDER_SHIPPED {
+        return fmt.Errorf("当前状态 %s 无法执行送达操作，只有运输中状态才能送达", order.Status)
+    }
+
+    now, err := s.getTxTimestamp(ctx)
+    if err != nil {
+        return err
+    }
+    order.Status = ORDER_DELIVERED
+    order.UpdateTime = now
+
+    newOrderBytes, err := json.Marshal(order)
+    if err != nil {
+        return fmt.Errorf("序列化订单失败: %v", err)
+    }
+    return ctx.GetStub().PutState(orderId, newOrderBytes)
+}
+
 // ConfirmReceipt 主机厂签收 (仅 Org1 可调用)
 func (s *SmartContract) ConfirmReceipt(ctx contractapi.TransactionContextInterface, orderId string) error {
     clientMSPID, err := s.getClientIdentityMSPID(ctx)
@@ -317,6 +356,11 @@ func (s *SmartContract) ConfirmReceipt(ctx contractapi.TransactionContextInterfa
     orderBytes, _ := ctx.GetStub().GetState(orderId)
     var order Order
     json.Unmarshal(orderBytes, &order)
+
+    // 状态校验：只有 DELIVERED 状态才能签收
+    if order.Status != ORDER_DELIVERED {
+        return fmt.Errorf("当前状态 %s 无法签收，只有已送达状态才能签收", order.Status)
+    }
 
     now, err := s.getTxTimestamp(ctx)
     if err != nil {

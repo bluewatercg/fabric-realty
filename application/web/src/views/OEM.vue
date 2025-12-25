@@ -34,7 +34,7 @@
               <a-space>
                 <a-button size="small" @click="viewOrder(record)">查看详情</a-button>
                 <a-button
-                  v-if="record.status === 'SHIPPED' || record.status === 'DELIVERED'"
+                  v-if="record.status === 'DELIVERED'"
                   type="primary"
                   size="small"
                   @click="confirmReceipt(record.id)"
