@@ -1,3 +1,4 @@
+```go
 package service
 
 import (
@@ -188,11 +189,11 @@ type DiffDetail struct {
 
 // EnhancedHistoryRecord 是最终返回给前端的、包含 diff 的丰富历史记录结构
 type EnhancedHistoryRecord struct {
-	TxId      string                 `json:"txId"`
-	Timestamp time.Time              `json:"timestamp"`
-	IsDelete  bool                   `json:"isDelete"`
+	TxId      string                `json:"txId"`
+	Timestamp time.Time             `json:"timestamp"`
+	IsDelete  bool                  `json:"isDelete"`
 	Value     map[string]interface{} `json:"value"`
-	Diff      map[string]DiffDetail  `json:"diff"`
+	Diff      map[string]DiffDetail `json:"diff"`
 }
 
 // generateDiff 比较两个 map 并生成字段级的差异
@@ -249,7 +250,7 @@ func (s *SupplyChainService) QueryOrderHistory(id string) ([]EnhancedHistoryReco
 	if len(rawHistory) == 0 {
 		return []EnhancedHistoryRecord{}, nil
 	}
-
+	
 	enhancedHistory := make([]EnhancedHistoryRecord, len(rawHistory))
 
 	// 倒序遍历，从最新版本开始，方便与前一版本比较
@@ -285,6 +286,7 @@ type ShipmentHistoryRecord struct {
 	Status    string    `json:"status"`
 	IsDelete  bool      `json:"isDelete"`
 }
+
 
 // QueryShipmentHistory 查询物流单历史
 func (s *SupplyChainService) QueryShipmentHistory(id string) ([]ShipmentHistoryRecord, error) {
