@@ -21,8 +21,15 @@ $PackageName = "deploy_package.tar.gz"
 
 # 2. 将所有构建产物打包成一个单独的压缩文件
 Write-Host "`n>>> 第二步：创建部署压缩包 ($PackageName)..." -ForegroundColor Cyan
-tar -zc -C build -f $PackageName . 2>> $logFile
-Write-Host "部署包创建成功."
+# 排除内部的 project.tar.gz 避免嵌套压缩，使用绝对路径确保正确执行
+$buildDir = Join-Path (Get-Location) "build"
+if (Test-Path $buildDir) {
+    # 使用 --exclude 排除 project.tar.gz 和其他不必要的文件
+    tar -zc -C $buildDir --exclude='project.tar.gz' -f $PackageName .
+    Write-Host "部署包创建成功."
+} else {
+    Write-Error "错误: build 目录不存在，请先运行 build_and_package.ps1"
+}
 
 # 3. 上传压缩包到服务器
 Write-Host "`n>>> 第三步：使用 scp 上传文件 ($REMOTE_IP)..." -ForegroundColor Cyan
