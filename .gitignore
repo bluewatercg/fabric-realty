@@ -7,3 +7,4 @@ build/
 chaincode/vendor
 temp_mvp1/
 /*.gz
+/*.log
