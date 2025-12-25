@@ -282,7 +282,7 @@ func (h *SupplyChainHandler) QueryAllLedgerData(c *gin.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
 	bookmark := c.DefaultQuery("bookmark", "")
 
-	result, err := h.scService.QueryAllLedgerData(pageSize, bookmark)
+	result, err := h.scService.QueryAllLedgerData(int32(pageSize), bookmark)
 	if err != nil {
 		log.Printf("QueryAllLedgerData Error: %v", err)
 		utils.ServerError(c, err.Error())

@@ -157,7 +157,7 @@ func (s *SupplyChainService) QueryShipment(id string) (map[string]interface{}, e
 }
 
 func (s *SupplyChainService) QueryAllLedgerData(pageSize int32, bookmark string) (map[string]interface{}, error) {
-	contract := fabric.GetContract(OEM_ORG)
+	contract := fabric.GetContract(PLATFORM_ORG)
 	result, err := contract.EvaluateTransaction("QueryAllLedgerData", fmt.Sprintf("%d", pageSize), bookmark)
 	if err != nil {
 		return nil, fmt.Errorf("查询所有数据失败：%s", fabric.ExtractErrorMessage(err))
