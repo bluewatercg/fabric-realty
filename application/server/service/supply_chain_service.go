@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"sort"
 	"strings"
 	"time"
 
@@ -250,28 +251,32 @@ func (s *SupplyChainService) QueryOrderHistory(id string) ([]EnhancedHistoryReco
 		return []EnhancedHistoryRecord{}, nil
 	}
 
-	enhancedHistory := make([]EnhancedHistoryRecord, len(rawHistory))
+	// 前端时间轴默认按「最新在前」展示；Diff 表示「与上一版本(更旧)对比」。
+	// 不同 Fabric 版本/实现对 GetHistoryForKey 的返回顺序可能存在差异，这里统一按 timestamp 降序排序，
+	// 并以“下一条记录(更旧)”作为 oldState，避免出现与更“新”版本对比导致的错乱。
+	sort.SliceStable(rawHistory, func(i, j int) bool {
+		return rawHistory[i].Timestamp.After(rawHistory[j].Timestamp)
+	})
 
-	// 倒序遍历，从最新版本开始，方便与前一版本比较
-	for i := len(rawHistory) - 1; i >= 0; i-- {
+	enhancedHistory := make([]EnhancedHistoryRecord, 0, len(rawHistory))
+	for i := 0; i < len(rawHistory); i++ {
 		var oldState map[string]interface{}
-		if i > 0 {
-			oldState = rawHistory[i-1].Value
+		if i+1 < len(rawHistory) {
+			oldState = rawHistory[i+1].Value
 		} else {
-			// 第一个版本，没有更早的状态
 			oldState = make(map[string]interface{})
 		}
 
 		newState := rawHistory[i].Value
 		diff := generateDiff(oldState, newState)
 
-		enhancedHistory[i] = EnhancedHistoryRecord{
+		enhancedHistory = append(enhancedHistory, EnhancedHistoryRecord{
 			TxId:      rawHistory[i].TxId,
 			Timestamp: rawHistory[i].Timestamp,
 			IsDelete:  rawHistory[i].IsDelete,
 			Value:     newState,
 			Diff:      diff,
-		}
+		})
 	}
 
 	return enhancedHistory, nil
@@ -294,28 +299,30 @@ func (s *SupplyChainService) QueryShipmentHistory(id string) ([]EnhancedHistoryR
 		return []EnhancedHistoryRecord{}, nil
 	}
 
-	enhancedHistory := make([]EnhancedHistoryRecord, len(rawHistory))
+	// 与订单历史保持一致：统一按 timestamp 降序（最新在前），并将“下一条(更旧)”作为 oldState。
+	sort.SliceStable(rawHistory, func(i, j int) bool {
+		return rawHistory[i].Timestamp.After(rawHistory[j].Timestamp)
+	})
 
-	// 倒序遍历，从最新版本开始，方便与前一版本比较
-	for i := len(rawHistory) - 1; i >= 0; i-- {
+	enhancedHistory := make([]EnhancedHistoryRecord, 0, len(rawHistory))
+	for i := 0; i < len(rawHistory); i++ {
 		var oldState map[string]interface{}
-		if i > 0 {
-			oldState = rawHistory[i-1].Value
+		if i+1 < len(rawHistory) {
+			oldState = rawHistory[i+1].Value
 		} else {
-			// 第一个版本，没有更早的状态
 			oldState = make(map[string]interface{})
 		}
 
 		newState := rawHistory[i].Value
 		diff := generateDiff(oldState, newState)
 
-		enhancedHistory[i] = EnhancedHistoryRecord{
+		enhancedHistory = append(enhancedHistory, EnhancedHistoryRecord{
 			TxId:      rawHistory[i].TxId,
 			Timestamp: rawHistory[i].Timestamp,
 			IsDelete:  rawHistory[i].IsDelete,
 			Value:     newState,
 			Diff:      diff,
-		}
+		})
 	}
 
 	return enhancedHistory, nil
