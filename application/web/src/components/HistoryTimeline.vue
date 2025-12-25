@@ -3,99 +3,87 @@
     <a-spin :spinning="loading">
       <a-empty v-if="!loading && history.length === 0" description="暂无历史记录" />
       
-      <a-timeline v-else mode="left" class="timeline-container">
-        <a-timeline-item
-          v-for="(record, index) in history"
-          :key="record.txId"
-          :color="getTimelineColor(record)"
-        >
-          <!-- 时间轴节点标题 -->
-          <template #label>
-            <div class="timeline-label">
-              <div class="timeline-timestamp">{{ formatTimestamp(record.timestamp) }}</div>
-              <div class="timeline-status">
-                <a-tag :color="getStatusColor(record)">
-                  {{ getStatusText(record) }}
-                </a-tag>
-              </div>
-            </div>
-          </template>
-          
-          <!-- 时间轴节点内容 -->
-          <div class="timeline-content">
-            <!-- 元数据面板 -->
-            <div class="metadata-panel">
-              <div class="metadata-row">
-                <span class="metadata-label">交易ID:</span>
-                <a-tooltip :title="record.txId">
-                  <span class="metadata-value txid">{{ truncateTxId(record.txId) }}</span>
-                </a-tooltip>
-              </div>
-              <div class="metadata-row">
-                <span class="metadata-label">操作类型:</span>
-                <a-tag :color="record.isDelete ? 'red' : 'green'" size="small">
-                  {{ record.isDelete ? '删除' : '更新/创建' }}
-                </a-tag>
-              </div>
-              <div class="metadata-row" v-if="index === history.length - 1">
-                <a-tag color="blue">首次创建</a-tag>
-              </div>
-            </div>
-
-            <!-- 操作按钮 -->
-            <div class="action-buttons">
-              <a-button
-                size="small"
-                @click="toggleExpand(record.txId, 'json')"
-                :type="expandedItems[record.txId]?.json ? 'primary' : 'default'"
+      <a-row v-else :gutter="24" class="timeline-layout">
+        <!-- 左侧时间轴 (1/3) -->
+        <a-col :span="8" class="timeline-side">
+          <div class="timeline-list-container">
+            <a-timeline mode="left">
+              <a-timeline-item
+                v-for="(record, index) in history"
+                :key="record.txId"
+                :color="getTimelineColor(record)"
+                class="clickable-timeline-item"
+                :class="{ active: selectedTxId === record.txId }"
+                @click="selectedTxId = record.txId"
               >
-                <template #icon>
-                  <span v-if="expandedItems[record.txId]?.json">▲</span>
-                  <span v-else>▼</span>
-                </template>
-                {{ expandedItems[record.txId]?.json ? '收起' : '展开' }} JSON
-              </a-button>
-              
-              <a-button
-                size="small"
-                @click="toggleExpand(record.txId, 'diff')"
-                :type="expandedItems[record.txId]?.diff ? 'primary' : 'default'"
-                :disabled="index === history.length - 1"
-              >
-                <template #icon>
-                  <span v-if="expandedItems[record.txId]?.diff">▲</span>
-                  <span v-else>▼</span>
-                </template>
-                {{ expandedItems[record.txId]?.diff ? '收起' : '展开' }} Diff
-              </a-button>
+                <div class="timeline-item-content">
+                  <div class="timeline-item-time">{{ formatTimestamp(record.timestamp) }}</div>
+                  <div class="timeline-item-status">
+                    <a-tag :color="getStatusColor(record)" size="small">
+                      {{ getStatusText(record) }}
+                    </a-tag>
+                  </div>
+                </div>
+              </a-timeline-item>
+            </a-timeline>
+          </div>
+        </a-col>
+
+        <!-- 右侧详情展示 (2/3) -->
+        <a-col :span="16" class="detail-side">
+          <div v-if="selectedRecord" class="detail-container">
+            <!-- 头部元数据 -->
+            <div class="detail-header">
+              <div class="detail-title">版本详情</div>
+              <div class="metadata-grid">
+                <div class="metadata-item">
+                  <span class="label">交易ID:</span>
+                  <span class="value txid">{{ selectedRecord.txId }}</span>
+                </div>
+                <div class="metadata-item">
+                  <span class="label">提交时间:</span>
+                  <span class="value">{{ formatTimestamp(selectedRecord.timestamp) }}</span>
+                </div>
+                <div class="metadata-item">
+                  <span class="label">操作类型:</span>
+                  <a-tag :color="selectedRecord.isDelete ? 'red' : 'green'" size="small">
+                    {{ selectedRecord.isDelete ? '删除' : '更新/创建' }}
+                  </a-tag>
+                  <a-tag v-if="selectedIndex === history.length - 1" color="blue" size="small" style="margin-left: 8px">首次创建</a-tag>
+                </div>
+              </div>
             </div>
 
-            <!-- JSON 展开区域 -->
-            <div v-show="expandedItems[record.txId]?.json" class="expand-section">
-              <div class="section-title">
-                <span class="title-icon">📄</span>
-                <span>完整状态数据 (JSON)</span>
-              </div>
-              <JsonViewer :data="record.value" />
-            </div>
-
-            <!-- Diff 展开区域 -->
-            <div v-show="expandedItems[record.txId]?.diff && index < history.length - 1" class="expand-section">
-              <div class="section-title">
-                <span class="title-icon">🔄</span>
-                <span>与上一版本对比 (Diff)</span>
-              </div>
-              <DiffViewer :diff="record.diff" />
+            <!-- 内容切换区域 -->
+            <div class="detail-content">
+              <a-tabs v-model:activeKey="activeTab" size="small">
+                <a-tab-pane key="diff" tab="数据对比 (Diff)">
+                  <div class="pane-content">
+                    <div v-if="selectedIndex === history.length - 1" class="first-version-hint">
+                      <a-empty description="这是该记录的初始版本，无历史对比数据" />
+                    </div>
+                    <DiffViewer v-else :diff="selectedRecord.diff" />
+                  </div>
+                </a-tab-pane>
+                <a-tab-pane key="json" tab="完整状态 (JSON)">
+                  <div class="pane-content">
+                    <JsonViewer :data="selectedRecord.value" />
+                  </div>
+                </a-tab-pane>
+              </a-tabs>
             </div>
           </div>
-        </a-timeline-item>
-      </a-timeline>
+          <div v-else class="empty-detail">
+            <a-empty description="请选择左侧记录查看详情" />
+          </div>
+        </a-col>
+      </a-row>
     </a-spin>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue';
+import { ref, computed, watch } from 'vue';
 import DiffViewer from './DiffViewer.vue';
 import JsonViewer from './JsonViewer.vue';
 
@@ -121,16 +109,30 @@ const props = withDefaults(defineProps<Props>(), {
   loading: false
 });
 
-// 展开状态管理
-const expandedItems = reactive<Record<string, { json?: boolean; diff?: boolean }>>({});
+// 状态管理
+const selectedTxId = ref<string | null>(null);
+const activeTab = ref('diff');
 
-// 切换展开/折叠
-const toggleExpand = (txId: string, type: 'json' | 'diff') => {
-  if (!expandedItems[txId]) {
-    expandedItems[txId] = {};
+// 监听 history 变化，自动选择第一条
+watch(() => props.history, (newHistory) => {
+  if (newHistory && newHistory.length > 0) {
+    if (!selectedTxId.value || !newHistory.find(r => r.txId === selectedTxId.value)) {
+      selectedTxId.value = newHistory[0].txId;
+    }
   }
-  expandedItems[txId][type] = !expandedItems[txId][type];
-};
+}, { immediate: true });
+
+const selectedRecord = computed(() => props.history.find(r => r.txId === selectedTxId.value));
+const selectedIndex = computed(() => props.history.findIndex(r => r.txId === selectedTxId.value));
+
+// 监听选中项变化，如果是首个版本且当前在 diff 标签页，则切换到 json 标签页
+watch(selectedIndex, (newIndex) => {
+  if (newIndex === props.history.length - 1 && activeTab.value === 'diff' && props.history.length > 0) {
+    activeTab.value = 'json';
+  } else if (newIndex !== props.history.length - 1 && newIndex !== -1) {
+    activeTab.value = 'diff';
+  }
+});
 
 // 格式化时间戳
 const formatTimestamp = (timestamp: string | Date): string => {
@@ -144,12 +146,6 @@ const formatTimestamp = (timestamp: string | Date): string => {
     second: '2-digit',
     hour12: false
   });
-};
-
-// 截断交易ID
-const truncateTxId = (txId: string): string => {
-  if (txId.length <= 16) return txId;
-  return `${txId.substring(0, 8)}...${txId.substring(txId.length - 8)}`;
 };
 
 // 获取时间轴颜色
@@ -201,124 +197,130 @@ const getStatusColor = (record: HistoryRecord): string => {
 
 <style scoped>
 .history-timeline {
-  padding: 16px 0;
+  height: 100%;
 }
 
-.timeline-container {
-  margin-top: 20px;
+.timeline-layout {
+  min-height: 500px;
 }
 
-/* 时间轴标签区域 */
-.timeline-label {
-  text-align: right;
+.timeline-side {
+  border-right: 1px solid #f0f0f0;
   padding-right: 16px;
+  max-height: 65vh;
+  overflow-y: auto;
 }
 
-.timeline-timestamp {
+.clickable-timeline-item {
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 4px;
+  transition: all 0.3s;
+  margin-bottom: 0 !important;
+  padding-bottom: 20px !important;
+}
+
+.clickable-timeline-item:hover {
+  background: #f5f5f5;
+}
+
+.clickable-timeline-item.active {
+  background: #e6f7ff;
+}
+
+.timeline-item-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.timeline-item-time {
   font-size: 13px;
   color: #666;
-  margin-bottom: 4px;
   font-family: 'Monaco', 'Menlo', monospace;
 }
 
-.timeline-status {
-  margin-top: 4px;
+.detail-side {
+  padding-left: 24px;
+  max-height: 65vh;
+  overflow-y: auto;
 }
 
-/* 时间轴内容区域 */
-.timeline-content {
-  background: #fff;
-  border: 1px solid #e8e8e8;
-  border-radius: 4px;
+.detail-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.detail-header {
+  background: #fafafa;
   padding: 16px;
-  min-width: 500px;
+  border-radius: 4px;
+  border: 1px solid #f0f0f0;
 }
 
-/* 元数据面板 */
-.metadata-panel {
+.detail-title {
+  font-size: 16px;
+  font-weight: 600;
   margin-bottom: 12px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.metadata-row {
-  display: flex;
-  align-items: center;
-  margin-bottom: 8px;
-  gap: 8px;
-}
-
-.metadata-row:last-child {
-  margin-bottom: 0;
-}
-
-.metadata-label {
-  font-weight: 500;
-  color: #666;
-  min-width: 70px;
-}
-
-.metadata-value {
   color: #262626;
 }
 
-.metadata-value.txid {
-  font-family: 'Monaco', 'Menlo', monospace;
-  font-size: 12px;
-  color: #1890ff;
-  cursor: help;
+.metadata-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-/* 操作按钮 */
-.action-buttons {
+.metadata-item {
   display: flex;
   gap: 8px;
-  margin-bottom: 12px;
-}
-
-/* 展开区域 */
-.expand-section {
-  margin-top: 16px;
-  animation: slideDown 0.3s ease-out;
-}
-
-@keyframes slideDown {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.section-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-  font-weight: 500;
-  color: #262626;
   font-size: 14px;
 }
 
-.title-icon {
-  font-size: 16px;
+.metadata-item .label {
+  color: #8c8c8c;
+  min-width: 70px;
+}
+
+.metadata-item .value {
+  color: #262626;
+}
+
+.metadata-item .value.txid {
+  font-family: 'Monaco', 'Menlo', monospace;
+  font-size: 12px;
+  color: #1890ff;
+  word-break: break-all;
+}
+
+.pane-content {
+  margin-top: 12px;
+}
+
+.first-version-hint {
+  padding: 40px 0;
+}
+
+.empty-detail {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  color: #999;
 }
 
 /* 响应式 */
 @media (max-width: 768px) {
-  .timeline-content {
-    min-width: auto;
-  }
-  
-  .action-buttons {
+  .timeline-layout {
     flex-direction: column;
   }
   
-  .action-buttons .ant-btn {
-    width: 100%;
+  .timeline-side {
+    border-right: none;
+    border-bottom: 1px solid #f0f0f0;
+    margin-bottom: 24px;
+    max-height: 30vh;
   }
 }
 </style>
