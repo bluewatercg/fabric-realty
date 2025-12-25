@@ -118,10 +118,10 @@
       </a-descriptions>
     </a-modal>
 
-    <!-- 订单历史记录弹窗（审计追踪） -->
+    <!-- 订单历史记录（Blockchain）弹窗（审计追踪） -->
     <a-modal
       v-model:visible="showHistoryModal"
-      title="订单历史记录 (链上审计追踪)"
+      title="订单历史记录（Blockchain） (链上审计追踪)"
       :footer="null"
       width="1000px"
     >
@@ -259,7 +259,7 @@ const viewShipment = async (shipmentId: string) => {
   }
 };
 
-// 查看历史记录
+// 查看历史记录（Blockchain）
 const viewHistory = async (orderId: string) => {
   historyLoading.value = true;
   showHistoryModal.value = true;
@@ -271,7 +271,7 @@ const viewHistory = async (orderId: string) => {
     }));
     expandedRowKeys.value = []; // 默认不展开
   } catch (error: any) {
-    message.error('加载历史记录失败: ' + (error.message || '未知错误'));
+    message.error('加载历史记录（Blockchain）失败: ' + (error.message || '未知错误'));
     showHistoryModal.value = false;
   } finally {
     historyLoading.value = false;

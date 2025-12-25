@@ -30,7 +30,7 @@ Write-Host "镜像已导出至 $BUILD_DIR 目录。"
 
 Write-Host "=== 5. 打包项目源码 (排除 build 与无关目录) ===" -ForegroundColor Cyan
 # Windows 11 自带 tar 命令
-tar -zcvf "$BUILD_DIR/project.tar.gz" --exclude='node_modules' --exclude='.git' --exclude='temp_mvp1' --exclude="$BUILD_DIR" .
+tar -zcvf "$BUILD_DIR/project.tar.gz" --exclude-from ./.tarignore .
 
 # 将 remote_install.sh 复制到 build 目录中
 Copy-Item -Path remote_install.sh -Destination $BUILD_DIR
