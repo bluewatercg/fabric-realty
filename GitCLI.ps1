@@ -1,12 +1,10 @@
-# GitCLI.ps1 - 最终全能推送版
+# GitCLI.ps1 - 最终全能推送版（含带时间戳的安全拉取远程同名分支）
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 chcp 65001 > $null
-
 Clear-Host
 Write-Host "===========================================" -ForegroundColor Cyan
-Write-Host "         Git 菜单工具（全能推送版）" -ForegroundColor Green
+Write-Host " Git 菜单工具（全能推送版）" -ForegroundColor Green
 Write-Host "===========================================" -ForegroundColor Cyan
-
 Set-Location -Path $PSScriptRoot
 
 function Get-CurrentBranch {
@@ -29,23 +27,23 @@ while ($true) {
     Write-Host "仓库路径: $(Get-Location)" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "请选择操作（输入数字后回车）：" -ForegroundColor Green
-    Write-Host "1. 拉取最新代码       (git pull)"
-    Write-Host "2. 推送选项菜单       (Push / Commit+Push)" -ForegroundColor Magenta
-    Write-Host "3. 拉取远程分支       (最新在前，显示时间+消息)"
+    Write-Host "1. 拉取最新代码 (git pull)"
+    Write-Host "2. 推送选项菜单 (Push / Commit+Push)" -ForegroundColor Magenta
+    Write-Host "3. 拉取远程分支 (最新在前，显示时间+消息)"
     Write-Host "4. 切换本地分支"
-    Write-Host "5. 查看状态           (git status)"
-    Write-Host "6. 查看日志           (git log --oneline --graph)"
+    Write-Host "5. 查看状态 (git status)"
+    Write-Host "6. 查看日志 (git log --oneline --graph)"
+    Write-Host "7. 安全拉取远程同名分支（本地改名测试用）" -ForegroundColor Yellow
     Write-Host "0. 退出程序"
     Write-Host ""
-
-    $choice = Read-Host "请输入 0-6"
+    $choice = Read-Host "请输入 0-7"
 
     switch ($choice) {
-        "1" { 
+        "1" {
             Write-Host "正在拉取代码..." -ForegroundColor Cyan
             Invoke-GitQuietly "git pull"
         }
-        
+       
         "2" {
             Write-Host "`n--- 推送功能细分 ---" -ForegroundColor Magenta
             Write-Host "1. 普通推送 (仅推送已有的 Commit)"
@@ -54,10 +52,9 @@ while ($true) {
             Write-Host "4. [一键提交] + 强制推送 (覆盖远端)" -ForegroundColor Yellow
             Write-Host "0. 返回主菜单"
             $pushChoice = Read-Host "请选择"
-            
+           
             if ($pushChoice -match '^[1234]$') {
                 $commitMsg = ""
-                # 如果选择 3 或 4，先询问提交信息
                 if ($pushChoice -eq "3" -or $pushChoice -eq "4") {
                     $commitMsg = Read-Host "请输入提交信息 (直接回车使用默认)"
                     if (-not $commitMsg) { $commitMsg = "Update: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" }
@@ -65,31 +62,26 @@ while ($true) {
                     git add .
                     git commit -m "$commitMsg"
                 }
-
-                # 执行推送逻辑
                 switch ($pushChoice) {
-                    "1" { 
+                    "1" {
                         Write-Host "执行普通推送..." -ForegroundColor Cyan
-                        Invoke-GitQuietly "git push" 
+                        Invoke-GitQuietly "git push"
                     }
-                    "2" { 
+                    "2" {
                         Write-Host "确认强制推送吗？(y/n)" -ForegroundColor Red
                         if ((Read-Host) -eq "y") { Invoke-GitQuietly "git push --force-with-lease" }
                     }
-                    "3" { 
+                    "3" {
                         Write-Host "提交完成，正在普通推送..." -ForegroundColor Cyan
-                        Invoke-GitQuietly "git push" 
+                        Invoke-GitQuietly "git push"
                     }
-                    "4" { 
+                    "4" {
                         Write-Host "提交完成，确认强制覆盖远端吗？(y/n)" -ForegroundColor Red
                         if ((Read-Host) -eq "y") { Invoke-GitQuietly "git push --force-with-lease" }
                     }
                 }
             }
         }
-
-        "5" { git status }
-        "6" { git log --oneline --graph --decorate --all -20 }
 
         "3" {
             Write-Host "`n正在更新远程信息..." -ForegroundColor Yellow
@@ -155,8 +147,54 @@ while ($true) {
             }
         }
 
+        "5" { git status }
+
+        "6" { git log --oneline --graph --decorate --all -20 }
+
+            "7" {
+            $currentBranch = Get-CurrentBranch
+            if ($currentBranch -eq "no-git" -or $currentBranch -eq "detached") {
+                Write-Host "错误：当前不是有效的 Git 分支。" -ForegroundColor Red
+                continue
+            }
+
+            Write-Host "当前本地分支: $currentBranch" -ForegroundColor Yellow
+
+            # 自动生成带时间戳的临时分支名
+            $timestamp = Get-Date -Format "yyyyMMdd-HHmm"
+            $tempBranchName = "$currentBranch-remote-$timestamp"
+
+            $remoteBranch = "origin/$currentBranch"
+
+            Write-Host "正在从远程拉取最新 $remoteBranch 到本地临时分支 $tempBranchName ..." -ForegroundColor Cyan
+            
+            # 关键修复：正确传递 refspec
+            git fetch origin $($currentBranch):$($tempBranchName) --force
+
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "拉取失败，可能远程分支不存在或网络问题。" -ForegroundColor Red
+                continue
+            }
+
+            Write-Host "已成功创建本地临时分支: $tempBranchName" -ForegroundColor Green
+
+            $switchNow = Read-Host "是否立即切换到临时分支 $tempBranchName 进行测试？(y/n，默认 n)"
+            if ($switchNow -eq "y" -or $switchNow -eq "Y") {
+                Invoke-GitQuietly "git checkout $tempBranchName"
+                Write-Host "已切换到 $tempBranchName，你可以安全测试远程最新代码。" -ForegroundColor Green
+            }
+
+            Write-Host "`n推荐后续操作流程：" -ForegroundColor Gray
+            Write-Host "   1. 测试远程代码（当前已在临时分支或手动切换）"
+            Write-Host "   2. git checkout $currentBranch                 # 切回本地主力分支"
+            Write-Host "   3. git merge $tempBranchName                   # 或 git rebase，把远程改动合并进来"
+            Write-Host "   4. 本地测试合并后无问题 → 返回菜单选 2 → 4 强制推送覆盖远程"
+            Write-Host "   5. 用完后清理临时分支：git branch -D $tempBranchName"
+        }
+
         "0" { return }
     }
+
     Write-Host ""
     Read-Host "按 Enter 键继续..."
 }

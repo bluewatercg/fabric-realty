@@ -73,6 +73,7 @@ func main() {
 	platformGroup := apiGroup.Group("/platform")
 	{
 		platformGroup.GET("/order/list", scHandler.QueryOrderList)
+		platformGroup.GET("/all", scHandler.QueryAllLedgerData)
 	}
 
 	// 启动服务器

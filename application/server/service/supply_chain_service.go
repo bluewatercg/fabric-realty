@@ -156,6 +156,21 @@ func (s *SupplyChainService) QueryShipment(id string) (map[string]interface{}, e
 	return shipment, nil
 }
 
+func (s *SupplyChainService) QueryAllLedgerData(pageSize int32, bookmark string) (map[string]interface{}, error) {
+	contract := fabric.GetContract(OEM_ORG)
+	result, err := contract.EvaluateTransaction("QueryAllLedgerData", fmt.Sprintf("%d", pageSize), bookmark)
+	if err != nil {
+		return nil, fmt.Errorf("查询所有数据失败：%s", fabric.ExtractErrorMessage(err))
+	}
+
+	var queryResult map[string]interface{}
+	if err := json.Unmarshal(result, &queryResult); err != nil {
+		return nil, fmt.Errorf("解析查询结果失败：%v", err)
+	}
+
+	return queryResult, nil
+}
+
 // OrderHistoryRecord 订单历史记录
 type OrderHistoryRecord struct {
 	TxId      string    `json:"txId"`

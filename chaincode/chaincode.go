@@ -356,6 +356,35 @@ func (s *SmartContract) QueryShipment(ctx contractapi.TransactionContextInterfac
     return &shipment, nil
 }
 
+// QueryAllLedgerData 查询所有数据
+func (s *SmartContract) QueryAllLedgerData(ctx contractapi.TransactionContextInterface, pageSize int32, bookmark string) (*QueryResponse, error) {
+    resultsIterator, responseMetadata, err := ctx.GetStub().GetStateByRangeWithPagination("", "", pageSize, bookmark)
+    if err != nil {
+        return nil, err
+    }
+    defer resultsIterator.Close()
+
+    records := make([]interface{}, 0)
+    for resultsIterator.HasNext() {
+        queryResponse, err := resultsIterator.Next()
+        if err != nil {
+            return nil, err
+        }
+
+        var record map[string]interface{}
+        if err := json.Unmarshal(queryResponse.Value, &record); err == nil {
+            records = append(records, record)
+        }
+    }
+
+    return &QueryResponse{
+        Records:             records,
+        RecordsCount:        int32(len(records)),
+        Bookmark:            responseMetadata.Bookmark,
+        FetchedRecordsCount: responseMetadata.FetchedRecordsCount,
+    }, nil
+}
+
 // QueryOrderList 分页查询订单 (示例)
 func (s *SmartContract) QueryOrderList(ctx contractapi.TransactionContextInterface, pageSize int32, bookmark string) (*QueryResponse, error) {
     // 简单的全量查询，实际应使用 CouchDB Selector

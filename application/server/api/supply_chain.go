@@ -268,3 +268,25 @@ func (h *SupplyChainHandler) QueryShipmentHistory(c *gin.Context) {
 	}
 	utils.Success(c, history)
 }
+
+// @Summary 查询所有数据
+// @Description 查询账本上的所有数据
+// @Tags Platform
+// @Accept json
+// @Produce json
+// @Param pageSize query int false "每页数量" default(10)
+// @Param bookmark query string false "分页书签"
+// @Success 200 {object} utils.Response
+// @Router /api/platform/all [get]
+func (h *SupplyChainHandler) QueryAllLedgerData(c *gin.Context) {
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
+	bookmark := c.DefaultQuery("bookmark", "")
+
+	result, err := h.scService.QueryAllLedgerData(pageSize, bookmark)
+	if err != nil {
+		log.Printf("QueryAllLedgerData Error: %v", err)
+		utils.ServerError(c, err.Error())
+		return
+	}
+	utils.Success(c, result)
+}
