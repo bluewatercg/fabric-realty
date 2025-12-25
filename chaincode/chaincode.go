@@ -509,6 +509,14 @@ func (s *SmartContract) QueryOrderHistory(ctx contractapi.TransactionContextInte
     return history, nil
 }
 
+// ShipmentHistoryRecord 物流单历史记录（与订单历史格式统一）
+type ShipmentHistoryRecord struct {
+    TxId        string     `json:"txId"`      // 交易ID
+    Timestamp   time.Time  `json:"timestamp"` // 交易时间戳
+    IsDelete    bool       `json:"isDelete"`  // 是否是删除操作
+    Value       *Shipment  `json:"value"`     // 状态变更后的值
+}
+
 // QueryShipmentHistory 查询物流单历史记录
 func (s *SmartContract) QueryShipmentHistory(ctx contractapi.TransactionContextInterface, id string) ([]ShipmentHistoryRecord, error) {
     resultsIterator, err := ctx.GetStub().GetHistoryForKey(id)
@@ -536,22 +544,12 @@ func (s *SmartContract) QueryShipmentHistory(ctx contractapi.TransactionContextI
         history = append(history, ShipmentHistoryRecord{
             TxId:      queryResponse.TxId,
             Timestamp: txTimestamp,
-            Location:  shipment.Location,
-            Status:    shipment.Status,
             IsDelete:  queryResponse.IsDelete,
+            Value:     &shipment,
         })
     }
 
     return history, nil
-}
-
-// ShipmentHistoryRecord 物流单历史记录
-type ShipmentHistoryRecord struct {
-    TxId      string    `json:"txId"`      // 交易ID
-    Timestamp time.Time `json:"timestamp"` // 交易时间戳
-    Location  string    `json:"location"`  // 位置
-    Status    string    `json:"status"`    // 状态
-    IsDelete  bool      `json:"isDelete"`  // 是否是删除操作
 }
 
 func main() {

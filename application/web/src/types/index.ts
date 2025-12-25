@@ -41,3 +41,17 @@ export interface SupplyChainPageResult<T> {
   recordsCount: number;
   fetchedRecordsCount: number;
 }
+
+// 历史记录相关类型
+export interface DiffDetail {
+  old: any;
+  new: any;
+}
+
+export interface HistoryRecord {
+  txId: string;
+  timestamp: string;
+  isDelete: boolean;
+  value: any;
+  diff: Record<string, DiffDetail>;
+}
