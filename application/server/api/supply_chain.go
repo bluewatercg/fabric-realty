@@ -269,8 +269,9 @@ func (h *SupplyChainHandler) QueryShipmentHistory(c *gin.Context) {
 	utils.Success(c, history)
 }
 
-// @Summary 查询所有数据
-// @Description 查询账本上的所有数据
+// QueryAllLedgerData 查询所有账本数据及历史
+// @Summary 查询所有账本数据及完整历史变更记录
+// @Description 查询账本上所有资产（订单和物流单）的当前状态及其完整的历史变更记录，用于审计和追溯
 // @Tags Platform
 // @Accept json
 // @Produce json

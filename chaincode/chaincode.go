@@ -356,8 +356,16 @@ func (s *SmartContract) QueryShipment(ctx contractapi.TransactionContextInterfac
     return &shipment, nil
 }
 
-// QueryAllLedgerData 查询所有数据
+// LedgerDataWithHistory 账本数据及其历史记录
+type LedgerDataWithHistory struct {
+    Key     string                   `json:"key"`
+    Current interface{}              `json:"current"`
+    History []map[string]interface{} `json:"history"`
+}
+
+// QueryAllLedgerData 查询所有数据及其完整历史变更记录
 func (s *SmartContract) QueryAllLedgerData(ctx contractapi.TransactionContextInterface, pageSize int32, bookmark string) (*QueryResponse, error) {
+    // 第一步：获取所有 key 的当前状态
     resultsIterator, responseMetadata, err := ctx.GetStub().GetStateByRangeWithPagination("", "", pageSize, bookmark)
     if err != nil {
         return nil, err
@@ -365,16 +373,57 @@ func (s *SmartContract) QueryAllLedgerData(ctx contractapi.TransactionContextInt
     defer resultsIterator.Close()
 
     records := make([]interface{}, 0)
+    
+    // 第二步：对每个 key 查询其完整历史
     for resultsIterator.HasNext() {
         queryResponse, err := resultsIterator.Next()
         if err != nil {
             return nil, err
         }
 
-        var record map[string]interface{}
-        if err := json.Unmarshal(queryResponse.Value, &record); err == nil {
-            records = append(records, record)
+        key := queryResponse.Key
+        
+        // 解析当前值
+        var currentData map[string]interface{}
+        if err := json.Unmarshal(queryResponse.Value, &currentData); err != nil {
+            log.Printf("解析数据失败 key=%s: %v", key, err)
+            continue
         }
+
+        // 查询该 key 的历史记录
+        historyIterator, err := ctx.GetStub().GetHistoryForKey(key)
+        if err != nil {
+            log.Printf("查询历史失败 key=%s: %v", key, err)
+            continue
+        }
+
+        history := make([]map[string]interface{}, 0)
+        for historyIterator.HasNext() {
+            historyData, err := historyIterator.Next()
+            if err != nil {
+                break
+            }
+
+            var value map[string]interface{}
+            if historyData.Value != nil {
+                json.Unmarshal(historyData.Value, &value)
+            }
+
+            history = append(history, map[string]interface{}{
+                "txId":      historyData.TxId,
+                "timestamp": historyData.Timestamp.AsTime(),
+                "isDelete":  historyData.IsDelete,
+                "value":     value,
+            })
+        }
+        historyIterator.Close()
+
+        // 组装结果
+        records = append(records, LedgerDataWithHistory{
+            Key:     key,
+            Current: currentData,
+            History: history,
+        })
     }
 
     return &QueryResponse{
