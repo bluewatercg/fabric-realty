@@ -123,37 +123,10 @@
       v-model:visible="showHistoryModal"
       title="订单历史记录（Blockchain） (链上审计追踪)"
       :footer="null"
-      width="1000px"
+      width="1200px"
+      :body-style="{ padding: '24px', maxHeight: '70vh', overflowY: 'auto' }"
     >
-      <a-table
-        :columns="historyColumns"
-        :data-source="orderHistory"
-        :loading="historyLoading"
-        row-key="txId"
-        size="small"
-        :expanded-row-keys="expandedRowKeys"
-        @expand="handleExpand"
-      >
-        <template #expandedRowRender="{ record }">
-          <div style="margin: 0; background: #fafafa; padding: 16px; border-radius: 4px;">
-            <p style="margin: 0 0 8px 0;"><strong>账本完整状态数据:</strong></p>
-            <pre style="background: #f5f5f5; padding: 12px; border-radius: 4px;">{{ JSON.stringify(record.value, null, 2) }}</pre>
-          </div>
-        </template>
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'isDelete'">
-            <a-tag :color="record.isDelete ? 'red' : 'green'">
-              {{ record.isDelete ? '删除' : '更新/创建' }}
-            </a-tag>
-          </template>
-          <template v-else-if="column.key === 'status'">
-            <a-tag v-if="record.isDelete" color="red">已删除</a-tag>
-            <a-tag v-else :color="getStatusColor(record.value?.status)">
-              {{ getStatusText(record.value?.status) || '--' }}
-            </a-tag>
-          </template>
-        </template>
-      </a-table>
+      <HistoryTimeline :history="orderHistory" :loading="historyLoading" />
     </a-modal>
   </div>
 </template>
@@ -162,7 +135,8 @@
 import { ref, onMounted, computed } from 'vue';
 import { message } from 'ant-design-vue';
 import { supplyChainApi } from '../api';
-import type { Order, Shipment } from '../types';
+import type { Order, Shipment, HistoryRecord } from '../types';
+import HistoryTimeline from '../components/HistoryTimeline.vue';
 
 const loading = ref(false);
 const orders = ref<Order[]>([]);
@@ -173,8 +147,7 @@ const showHistoryModal = ref(false);
 const selectedOrder = ref<Order | null>(null);
 const currentShipment = ref<Shipment | null>(null);
 const historyLoading = ref(false);
-const orderHistory = ref<any[]>([]);
-const expandedRowKeys = ref<string[]>([]);
+const orderHistory = ref<HistoryRecord[]>([]);
 
 const columns = [
   { title: '订单ID', dataIndex: 'id', key: 'id', width: 140, fixed: 'left' },
@@ -191,13 +164,6 @@ const itemColumns = [
   { title: '零件名称', dataIndex: 'name', key: 'name' },
   { title: '数量', dataIndex: 'quantity', key: 'quantity', width: 80 },
   { title: '单价', dataIndex: 'price', key: 'price', width: 100 },
-];
-
-const historyColumns = [
-  { title: '交易ID', dataIndex: 'txId', key: 'txId', ellipsis: true, width: 200 },
-  { title: '时间戳', dataIndex: 'timestamp', key: 'timestamp', width: 180 },
-  { title: '状态', key: 'status', width: 120 },
-  { title: '操作类型', key: 'isDelete', width: 100 },
 ];
 
 // 统计数据
@@ -264,25 +230,12 @@ const viewHistory = async (orderId: string) => {
   historyLoading.value = true;
   showHistoryModal.value = true;
   try {
-    const rawHistory = await supplyChainApi.getOrderHistory(orderId);
-    orderHistory.value = rawHistory.map(rec => ({
-      ...rec,
-      status: rec.value?.status || ''
-    }));
-    expandedRowKeys.value = []; // 默认不展开
+    orderHistory.value = await supplyChainApi.getOrderHistory(orderId);
   } catch (error: any) {
     message.error('加载历史记录（Blockchain）失败: ' + (error.message || '未知错误'));
     showHistoryModal.value = false;
   } finally {
     historyLoading.value = false;
-  }
-};
-
-const handleExpand = (expanded: boolean, record: any) => {
-  if (expanded) {
-    expandedRowKeys.value = [record.txId];
-  } else {
-    expandedRowKeys.value = [];
   }
 };
 

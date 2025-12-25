@@ -277,27 +277,46 @@ func (s *SupplyChainService) QueryOrderHistory(id string) ([]EnhancedHistoryReco
 	return enhancedHistory, nil
 }
 
-// ShipmentHistoryRecord 物流单历史记录
-type ShipmentHistoryRecord struct {
-	TxId      string    `json:"txId"`
-	Timestamp time.Time `json:"timestamp"`
-	Location  string    `json:"location"`
-	Status    string    `json:"status"`
-	IsDelete  bool      `json:"isDelete"`
-}
-
-// QueryShipmentHistory 查询物流单历史
-func (s *SupplyChainService) QueryShipmentHistory(id string) ([]ShipmentHistoryRecord, error) {
+// QueryShipmentHistory 查询物流单历史并计算版本差异
+func (s *SupplyChainService) QueryShipmentHistory(id string) ([]EnhancedHistoryRecord, error) {
 	contract := fabric.GetContract(CARRIER_ORG)
 	result, err := contract.EvaluateTransaction("QueryShipmentHistory", id)
 	if err != nil {
 		return nil, fmt.Errorf("查询物流历史失败：%s", fabric.ExtractErrorMessage(err))
 	}
 
-	var history []ShipmentHistoryRecord
-	if err := json.Unmarshal(result, &history); err != nil {
+	var rawHistory []RawHistoryRecord
+	if err := json.Unmarshal(result, &rawHistory); err != nil {
 		return nil, fmt.Errorf("解析物流历史数据失败：%v", err)
 	}
 
-	return history, nil
+	if len(rawHistory) == 0 {
+		return []EnhancedHistoryRecord{}, nil
+	}
+
+	enhancedHistory := make([]EnhancedHistoryRecord, len(rawHistory))
+
+	// 倒序遍历，从最新版本开始，方便与前一版本比较
+	for i := len(rawHistory) - 1; i >= 0; i-- {
+		var oldState map[string]interface{}
+		if i > 0 {
+			oldState = rawHistory[i-1].Value
+		} else {
+			// 第一个版本，没有更早的状态
+			oldState = make(map[string]interface{})
+		}
+
+		newState := rawHistory[i].Value
+		diff := generateDiff(oldState, newState)
+
+		enhancedHistory[i] = EnhancedHistoryRecord{
+			TxId:      rawHistory[i].TxId,
+			Timestamp: rawHistory[i].Timestamp,
+			IsDelete:  rawHistory[i].IsDelete,
+			Value:     newState,
+			Diff:      diff,
+		}
+	}
+
+	return enhancedHistory, nil
 }
