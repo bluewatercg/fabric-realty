@@ -218,27 +218,30 @@ auto_pop() {
 # ----------------------------
 # DeepSeek AI 提交助手
 # ----------------------------
+# ----------------------------
+# DeepSeek AI 提交助手 (修复版)
+# ----------------------------
 generate_ai_commit() {
     # 1. 检查环境变量
     if [[ -z "${DEEPSEEK_API_KEY:-}" ]]; then
-        echo -e "${C_ERROR}❌ 未检测到 DEEPSEEK_API_KEY 环境变量${C_RESET}"
-        echo -e "${C_INFO}请在终端执行: export DEEPSEEK_API_KEY='你的sk-key'${C_RESET}"
+        echo -e "${C_ERROR}❌ 未检测到 DEEPSEEK_API_KEY 环境变量${C_RESET}" >&2
+        echo -e "${C_INFO}请在终端执行: export DEEPSEEK_API_KEY='你的sk-key'${C_RESET}" >&2
         return 1
     fi
 
     # 2. 获取暂存区的 Diff
-    # 截取前 4000 字符防止超出 token 限制，足够 AI 理解上下文
     local diff_content=$(git diff --cached | head -c 4000)
     
     if [[ -z "$diff_content" ]]; then
-        echo -e "${C_WARN}⚠️ 暂存区为空，请先 git add 文件${C_RESET}"
+        echo -e "${C_WARN}⚠️ 暂存区为空，请先 git add 文件${C_RESET}" >&2
         return 1
     fi
 
-    echo -e "${C_INFO}🤖 正在请求 DeepSeek 分析代码变更...${C_RESET}"
+    # 关键修改：添加 >&2 让这句话直接显示在屏幕上，不被变量捕获
+    echo -e "${C_INFO}🤖 正在请求 DeepSeek 分析代码变更...${C_RESET}" >&2
 
-    # 3. 构造 JSON Payload (利用 jq 安全处理转义字符)
-    local system_prompt="你是一个资深开发者。请根据 git diff 生成一个符合 Conventional Commits 规范的英文 Commit Message（如 feat: add new feature）。要求：1. 仅输出 Message 本身，不要Markdown，不要解释。 2. 只有一行总结。"
+    # 3. 构造 JSON Payload
+    local system_prompt="你是一个资深开发者。请根据 git diff 生成一个符合 Conventional Commits 规范的英文 Commit Message。要求：1. 仅输出 Message 本身，不要Markdown，不要解释。 2. 只有一行总结。"
     
     local payload=$(jq -n \
                   --arg sys "$system_prompt" \
@@ -264,13 +267,12 @@ generate_ai_commit() {
 
     # 错误处理
     if [[ -z "$ai_msg" || "$ai_msg" == "null" ]]; then
-        echo -e "${C_ERROR}❌ API 调用失败或返回为空${C_RESET}"
-        # 调试用：打印错误信息（可选）
-        # echo "$response"
+        echo -e "${C_ERROR}❌ API 调用失败或返回为空${C_RESET}" >&2
+        echo "调试信息: $response" >&2
         return 1
     fi
 
-    # 6. 返回结果给调用者
+    # 6. 只输出纯净的结果给调用者
     echo "$ai_msg"
     return 0
 }
