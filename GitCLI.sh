@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 
 # ============================
 # GitCLI.sh - fzf 专业版 v2.0
@@ -585,35 +585,52 @@ browse_log() {
     fi
 }
 # ----------------------------
-# 主菜单
+# 主菜单 (修复显示版)
 # ----------------------------
 main_menu() {
     while true; do
-        clear
-        show_repo_status
-        echo ""
-        echo -e "${C_SUCCESS}🚀 GitCLI 专业工具 v2.0${C_RESET}"
-        echo ""
+        # 1. 移除 clear，改用 fzf 托管全屏
+        
+        # 2. 捕获状态面板的输出到变量
+        # 这里的关键是让 show_repo_status 的彩色输出保存在变量里
+        local status_panel=$(show_repo_status)
 
-        local choice=$(printf "拉取最新代码\n推送选项菜单\n远程分支浏览 + 拉取\n切换本地分支\n查看详细状态\n查看日志 (graph)\n自动 rebase\n创建 Pull Request\n分支健康评分\n智能文件结构迁移\n退出" |
-            fzf --prompt="选择操作 > ")
+        # 3. 构造菜单
+        # --header="$status_panel": 把状态面板作为 fzf 的头部固定显示
+        # --ansi: 让 fzf 解析颜色代码，否则面板会显示乱码
+        # --header-first: 头部显示在最上方
+        
+        local choice=$(printf "拉取最新代码\n推送选项菜单\n远程分支浏览 + 拉取\n切换本地分支\n查看详细状态\n查看日志 (graph)\n自动 rebase\n创建 Pull Request\n分支健康评分\n智能文件结构迁移\n退出" | \
+            fzf --ansi \
+                --prompt="选择操作 > " \
+                --header="$status_panel" \
+                --header-first \
+                --border \
+                --margin=1 \
+                --padding=1 || true)
 
-        case "$choice" in
-            "拉取最新代码") git pull ;;
-            "推送选项菜单") push_menu ;;
-            "远程分支浏览 + 拉取") pull_remote_branch ;;
-            "切换本地分支") switch_branch ;;
-            "查看详细状态") git status ;;
-            "查看日志 (graph)") browse_log ;;
-            "自动 rebase") auto_rebase ;;
-            "创建 Pull Request") create_pr ;;
-            "分支健康评分") echo -e "${C_INFO}当前健康评分：${C_SUCCESS}$(branch_health_score)/100${C_RESET}" ;;
-            "智能文件结构迁移") smart_file_migration ;;
-            "退出") echo -e "${C_SUCCESS}再见！${C_RESET}"; exit 0 ;;
-        esac
+        # 4. 处理选择
+        if [[ -z "$choice" ]]; then
+             # 用户按 Esc 退出选择时，不直接退出脚本，而是刷新
+             : 
+        else
+            case "$choice" in
+                "拉取最新代码") git pull ;;
+                "推送选项菜单") push_menu ;;
+                "远程分支浏览 + 拉取") pull_remote_branch ;;
+                "切换本地分支") switch_branch ;;
+                "查看详细状态") git status ;;
+                "查看日志 (graph)") browse_log ;;
+                "自动 rebase") auto_rebase ;;
+                "创建 Pull Request") create_pr ;;
+                "分支健康评分") echo -e "${C_INFO}当前健康评分：${C_SUCCESS}$(branch_health_score)/100${C_RESET}" ;;
+                "智能文件结构迁移") smart_file_migration ;;
+                "退出") echo -e "${C_SUCCESS}再见！${C_RESET}"; exit 0 ;;
+            esac
+        fi
 
         echo ""
-        read -n 1 -s -r -p "按任意键继续..."
+        read -n 1 -s -r -p "按任意键刷新菜单..."
     done
 }
 
