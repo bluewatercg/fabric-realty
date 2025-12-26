@@ -8,7 +8,15 @@ import (
 	"log"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"     // Corrected: import files and alias it
+	ginSwagger "github.com/swaggo/gin-swagger" // Corrected: import gin-swagger
 )
+
+// @title 供应链协同系统 API 文档
+// @version 1.0
+// @description 基于 Hyperledger Fabric 的汽配供应链协同系统 API 文档
+// @host localhost:8080
+// @BasePath /api
 
 func main() {
 	// 初始化配置
@@ -25,6 +33,9 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 
+	// Swagger 路由
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
 	apiGroup := r.Group("/api")
 
 	// 注册路由
@@ -36,6 +47,7 @@ func main() {
 		oemGroup.POST("/order/create", scHandler.CreateOrder)
 		oemGroup.PUT("/order/:id/receive", scHandler.ConfirmReceipt)
 		oemGroup.GET("/order/:id", scHandler.QueryOrder)
+		oemGroup.GET("/order/:id/history", scHandler.QueryOrderHistory)
 		oemGroup.GET("/order/list", scHandler.QueryOrderList)
 	}
 
@@ -53,6 +65,7 @@ func main() {
 		carrierGroup.POST("/shipment/pickup", scHandler.PickupGoods)
 		carrierGroup.PUT("/shipment/:id/location", scHandler.UpdateLocation)
 		carrierGroup.GET("/shipment/:id", scHandler.QueryShipment)
+		carrierGroup.GET("/shipment/:id/history", scHandler.QueryShipmentHistory)
 		carrierGroup.GET("/order/list", scHandler.QueryOrderList)
 	}
 
@@ -60,6 +73,7 @@ func main() {
 	platformGroup := apiGroup.Group("/platform")
 	{
 		platformGroup.GET("/order/list", scHandler.QueryOrderList)
+		platformGroup.GET("/all", scHandler.QueryAllLedgerData)
 	}
 
 	// 启动服务器

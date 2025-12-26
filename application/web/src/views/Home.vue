@@ -2,7 +2,7 @@
   <div class="home">
     <div class="home-page-header">
       <h1 class="page-title">选择您的组织身份</h1>
-      <p class="page-description">本系统由三个组织构成的联盟链网络共同维护</p>
+      <p class="page-description">本系统由四个组织构成的联盟链网络共同维护</p>
     </div>
 
     <div class="home-content">

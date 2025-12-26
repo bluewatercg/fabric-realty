@@ -62,10 +62,13 @@
 
     <!-- 取货弹窗 -->
     <a-modal
-      v-model:open="showPickup"
+      :visible="showPickup"
       title="取货并生成物流单"
+      :closable="true"
+      :maskClosable="false"
       @ok="handlePickup"
       @cancel="showPickup = false"
+      @close="showPickup = false"
     >
       <a-form layout="vertical">
         <a-form-item label="订单ID">
@@ -79,10 +82,13 @@
 
     <!-- 更新位置弹窗 -->
     <a-modal
-      v-model:open="showLocation"
+      :visible="showLocation"
       title="更新物流位置"
+      :closable="true"
+      :maskClosable="false"
       @ok="handleUpdateLocation"
       @cancel="showLocation = false"
+      @close="showLocation = false"
     >
       <a-form layout="vertical">
         <a-form-item label="物流单ID">
@@ -96,9 +102,11 @@
 
     <!-- 订单详情弹窗 -->
     <a-modal
-      v-model:open="showDetailModal"
+      :visible="showDetailModal"
       title="订单详情"
       :footer="null"
+      :closable="true"
+      @cancel="showDetailModal = false"
       width="600px"
     >
       <a-descriptions bordered v-if="selectedOrder">
@@ -125,9 +133,11 @@
 
     <!-- 物流详情弹窗 -->
     <a-modal
-      v-model:open="showShipmentModal"
+      :visible="showShipmentModal"
       title="物流详情"
       :footer="null"
+      :closable="true"
+      @cancel="showShipmentModal = false"
     >
       <a-descriptions bordered v-if="currentShipment">
         <a-descriptions-item label="物流单ID">{{ currentShipment.id }}</a-descriptions-item>

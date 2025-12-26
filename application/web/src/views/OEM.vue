@@ -54,10 +54,13 @@
 
     <!-- 创建订单弹窗 -->
     <a-modal
-      v-model:open="showCreateModal"
+      :visible="showCreateModal"
       title="创建采购订单"
+      :closable="true"
+      :maskClosable="false"
       @ok="handleCreateOrder"
-      @cancel="resetForm"
+      @cancel="showCreateModal = false"
+      @close="showCreateModal = false"
       width="600px"
     >
       <a-form :model="orderForm" layout="vertical">
@@ -100,9 +103,11 @@
 
     <!-- 订单详情弹窗 -->
     <a-modal
-      v-model:open="showDetailModal"
+      :visible="showDetailModal"
       title="订单详情"
       :footer="null"
+      :closable="true"
+      @cancel="showDetailModal = false"
       width="600px"
     >
       <a-descriptions bordered v-if="selectedOrder">
