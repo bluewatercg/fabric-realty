@@ -6,7 +6,7 @@
 # 日期: 2025-12-26
 # ============================
 
-set -euo pipefail
+#set -euo pipefail
 
 # ----------------------------
 # 颜色定义
@@ -348,16 +348,20 @@ smart_commit() {
         return
     fi
 
-    # 3. 执行提交
+# 3. 执行提交
     if [[ -n "$commit_msg" ]]; then
         git commit -m "$commit_msg"
         echo -e "${C_SUCCESS}🎉 提交成功！${C_RESET}"
         
-        # 询问推送
-        echo -e "${C_WARN}是否立即推送到远程？(y/n)${C_RESET}"
+        # 询问推送 (修改了提示语，大写 Y 表示默认)
+        echo -e "${C_WARN}是否立即推送到远程？(Y/n)${C_RESET}"
         read -r push_ans
-        if [[ "$push_ans" == "y" || "$push_ans" == "Y" ]]; then
+        
+        # 逻辑修改：如果输入为空 (-z) 或者 输入为 y/Y，都执行推送
+        if [[ -z "$push_ans" || "$push_ans" == "y" || "$push_ans" == "Y" ]]; then
             git push && echo -e "${C_SUCCESS}🚀 推送完成！${C_RESET}"
+        else
+            echo -e "${C_INFO}已跳过推送${C_RESET}"
         fi
     fi
 }
