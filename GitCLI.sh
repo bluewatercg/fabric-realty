@@ -205,9 +205,13 @@ auto_stash() {
 }
 
 auto_pop() {
-    if [[ "$1" == "0" ]]; then
-        echo -e "${C_INFO}正在恢复 stash...${C_RESET}"
-        git stash pop || echo -e "${C_WARN}stash pop 失败（可能为空）${C_RESET}"
+    [[ "$1" == "0" ]] || return
+    echo -e "${C_INFO}正在恢复 stash...${C_RESET}"
+    if ! git stash pop --quiet; then
+        echo -e "${C_ERROR}⚠️  stash pop 失败！你的修改可能无法自动恢复${C_RESET}"
+        echo -e "${C_ERROR}请立即执行以下命令尝试手动恢复：${C_RESET}"
+        echo -e "${C_INFO}git stash apply \$(git fsck --no-reflog | awk '/dangling commit/ {print \$3}' | tail -1)${C_RESET}"
+        echo -e "${C_WARN}或者查看 git reflog stash 找回丢失的修改${C_RESET}"
     fi
 }
 
