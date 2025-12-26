@@ -1,13 +1,15 @@
 ﻿#!/usr/bin/env bash
 
 # ============================
-# GitCLI.sh - fzf 专业版
+# GitCLI.sh - fzf 专业版 v2.0
+# 作者: 你 + Grok 优化
+# 日期: 2025-12-26
 # ============================
 
-set -e
+set -euo pipefail
 
 # ----------------------------
-# 颜色
+# 颜色定义
 # ----------------------------
 C_INFO="\033[36m"
 C_SUCCESS="\033[32m"
@@ -15,6 +17,14 @@ C_WARN="\033[33m"
 C_ERROR="\033[31m"
 C_MENU="\033[35m"
 C_RESET="\033[0m"
+
+# ----------------------------
+# 全局变量（缓存）
+# ----------------------------
+CURRENT_BRANCH=""
+REPO_PATH=""
+DEFAULT_BRANCH=""
+GH_HEADER=""
 
 # ----------------------------
 # 前置检查
@@ -27,8 +37,7 @@ check_dependencies() {
 
     if ! command -v fzf >/dev/null 2>&1; then
         echo -e "${C_ERROR}未检测到 fzf${C_RESET}"
-        echo -e "${C_INFO}安装方式:${C_RESET}"
-        echo "  sudo apt update && sudo apt install fzf"
+        echo -e "${C_INFO}安装建议: sudo apt install fzf  或  brew install fzf${C_RESET}"
         exit 1
     fi
 
@@ -37,9 +46,23 @@ check_dependencies() {
         exit 1
     fi
 
-    # 可选：用于 PR / 分支健康评分
+    if ! command -v jq >/dev/null 2>&1; then
+        echo -e "${C_WARN}未检测到 jq，GitHub PR 相关功能将降级使用 grep（不推荐）${C_RESET}"
+        echo -e "${C_INFO}强烈建议安装: sudo apt install jq  或  brew install jq${C_RESET}"
+    fi
+
     if ! command -v curl >/dev/null 2>&1; then
-        echo -e "${C_WARN}未检测到 curl，部分 GitHub 相关功能将不可用${C_RESET}"
+        echo -e "${C_WARN}未检测到 curl，GitHub 相关功能将不可用${C_RESET}"
+    fi
+
+    # 缓存变量
+    CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+    REPO_PATH=$(git config --get remote.origin.url | sed 's/.*github.com[:/]\(.*\)\.git/\1/' || echo "")
+    DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "main")
+
+    # GitHub Token 支持
+    if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+        GH_HEADER="-H \"Authorization: token $GITHUB_TOKEN\""
     fi
 }
 
@@ -56,33 +79,17 @@ log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG_FILE"
 }
 
-run_git() {
-    log "EXEC: git $*"
-    if ! output=$(git "$@" 2>&1); then
-        echo -e "${C_ERROR}Git 命令失败: git $*${C_RESET}"
-        echo "$output"
-        log "ERROR: $output"
-        return 1
-    fi
-    log "OK: $output"
-    echo "$output"
-}
-
 # ----------------------------
-# 基础功能
+# 基础工具函数
 # ----------------------------
-current_branch() {
-    git rev-parse --abbrev-ref HEAD
-}
-
 has_uncommitted() {
     [[ -n "$(git status --porcelain)" ]]
 }
 
 detect_conflicts() {
-    conflicts=$(git diff --name-only --diff-filter=U)
+    local conflicts=$(git diff --name-only --diff-filter=U)
     if [[ -n "$conflicts" ]]; then
-        echo -e "${C_ERROR}⚠ 检测到冲突文件：${C_RESET}"
+        echo -e "${C_ERROR}⚠️ 检测到冲突文件：${C_RESET}"
         echo "$conflicts"
         return 0
     fi
@@ -90,40 +97,33 @@ detect_conflicts() {
 }
 
 # ----------------------------
-# 仓库状态仪表盘 + 分支健康
+# 仓库状态与分支健康
 # ----------------------------
 branch_health_score() {
-    local current_branch
-    current_branch=$(current_branch)
-
-    # 默认分数 100，逐项扣减
     local score=100
+    local ahead=0 behind=0
 
-    # ahead / behind
-    local ahead=0
-    local behind=0
-    if git rev-parse --verify "origin/$current_branch" >/dev/null 2>&1; then
-        read -r behind ahead <<<"$(git rev-list --left-right --count "origin/$current_branch...$current_branch" 2>/dev/null)"
+    if git rev-parse --verify "origin/$CURRENT_BRANCH" >/dev/null 2>&1; then
+        read -r behind ahead <<<"$(git rev-list --left-right --count "origin/$CURRENT_BRANCH...$CURRENT_BRANCH" 2>/dev/null || echo "0 0")"
     fi
 
-    # ahead/behind 影响
     [[ $behind -gt 0 ]] && score=$((score - 20))
     [[ $ahead -gt 20 ]] && score=$((score - 10))
-
-    # rebase 需求
     [[ $behind -gt 0 ]] && score=$((score - 20))
 
-    # 冲突风险
     if git status --porcelain | grep -q '^UU '; then
         score=$((score - 30))
     fi
 
-    # PR 状态（无 PR 扣分）
-    local repo_url api_url pr_count
-    if command -v curl >/dev/null 2>&1; then
-        repo_url=$(git config --get remote.origin.url | sed 's/.*github.com[:/]\(.*\)\.git/\1/')
-        api_url="https://api.github.com/repos/${repo_url}/pulls?head=${repo_url%%/*}:$current_branch"
-        pr_count=$(curl -s "$api_url" | grep -c '"html_url"')
+    # PR 状态检测（支持 jq 优先）
+    if [[ -n "$REPO_PATH" ]] && command -v curl >/dev/null 2>&1; then
+        local api_url="https://api.github.com/repos/$REPO_PATH/pulls?head=${REPO_PATH%%/*}:$CURRENT_BRANCH"
+        local pr_count=0
+        if command -v jq >/dev/null 2>&1; then
+            pr_count=$(curl -s $GH_HEADER -H "Accept: application/vnd.github+json" "$api_url" | jq 'length' 2>/dev/null || echo 0)
+        else
+            pr_count=$(curl -s $GH_HEADER "$api_url" | grep -c '"html_url"' || echo 0)
+        fi
         [[ $pr_count -eq 0 ]] && score=$((score - 20))
     fi
 
@@ -132,39 +132,38 @@ branch_health_score() {
 }
 
 check_pr_status() {
-    if ! command -v curl >/dev/null 2>&1; then
-        echo -e "${C_WARN}PR 状态：curl 不可用，跳过检测${C_RESET}"
+    if [[ -z "$REPO_PATH" ]]; then
+        echo -e "${C_WARN}PR 状态：非 GitHub 仓库，跳过检测${C_RESET}"
         return
     fi
 
-    local repo_url current_branch api_url pr_count
-    repo_url=$(git config --get remote.origin.url | sed 's/.*github.com[:/]\(.*\)\.git/\1/')
-    current_branch=$(current_branch)
+    local api_url="https://api.github.com/repos/$REPO_PATH/pulls?head=${REPO_PATH%%/*}:$CURRENT_BRANCH"
+    local pr_count=0
 
-    api_url="https://api.github.com/repos/${repo_url}/pulls?head=${repo_url%%/*}:${current_branch}"
-    pr_count=$(curl -s "$api_url" | grep -c '"html_url"')
+    if command -v jq >/dev/null 2>&1; then
+        pr_count=$(curl -s $GH_HEADER -H "Accept: application/vnd.github+json" "$api_url" | jq 'length' 2>/dev/null || echo 0)
+    else
+        pr_count=$(curl -s $GH_HEADER "$api_url" | grep -c '"html_url"' || echo 0)
+    fi
 
-    if [[ "$pr_count" -gt 0 ]]; then
-        echo -e "${C_SUCCESS}PR 状态：当前分支已有 Pull Request${C_RESET}"
+    if [[ $pr_count -gt 0 ]]; then
+        echo -e "${C_SUCCESS}PR 状态：当前分支已有 $pr_count 个 Pull Request${C_RESET}"
     else
         echo -e "${C_WARN}PR 状态：当前分支尚未创建 PR${C_RESET}"
     fi
 }
 
 show_repo_status() {
-    local current
-    current=$(current_branch)
-
-    local added modified deleted untracked
-    added=$(git status --porcelain | grep '^A ' | wc -l)
-    modified=$(git status --porcelain | grep '^ M ' | wc -l)
-    deleted=$(git status --porcelain | grep '^ D ' | wc -l)
-    untracked=$(git status --porcelain | grep '^?? ' | wc -l)
+    local added modified deleted untrackedQQ
+    added=$(git status --porcelain 2>/dev/null | grep -c '^A ' || echo 0)
+    modified=$(git status --porcelain 2>/dev/null | grep -c '^ M' || echo 0)
+    deleted=$(git status --porcelain 2>/dev/null | grep -c '^ D ' || echo 0)
+    untracked=$(git status --porcelain 2>/dev/null | grep -c '^?? ' || echo 0)
 
     local ahead=0 behind=0 need_rebase="No"
-    if git rev-parse --verify "origin/$current" >/dev/null 2>&1; then
-        read -r behind ahead <<<"$(git rev-list --left-right --count "origin/$current...$current" 2>/dev/null)"
-        [[ "$behind" -gt 0 ]] && need_rebase="Yes"
+    if git rev-parse --verify "origin/$CURRENT_BRANCH" >/dev/null 2>&1; then
+        read -r behind ahead <<<"$(git rev-list --left-right --count "origin/$CURRENT_BRANCH...$CURRENT_BRANCH" 2>/dev/null || echo "0 0")"
+        [[ $behind -gt 0 ]] && need_rebase="Yes"
     fi
 
     local conflict_risk="No"
@@ -172,14 +171,14 @@ show_repo_status() {
         conflict_risk="Yes"
     fi
 
-    local health
-    health=$(branch_health_score)
+    local health=$(branch_health_score)
 
     echo -e "${C_MENU}================ GitCLI 状态面板 ================${C_RESET}"
-    echo -e "${C_INFO}当前分支：${C_SUCCESS}${current}${C_RESET}"
-    echo -e "${C_INFO}远程状态：${C_RESET}ahead ${ahead}, behind ${behind}"
-    echo -e "${C_INFO}是否需要 rebase：${C_RESET}${need_rebase}"
-    echo -e "${C_INFO}冲突风险：${C_RESET}${conflict_risk}"
+    echo -e "${C_INFO}当前分支：${C_SUCCESS}${CURRENT_BRANCH}${C_RESET}"
+    echo -e "${C_INFO}默认分支：${C_SUCCESS}${DEFAULT_BRANCH}${C_RESET}"
+    echo -e "${C_INFO}远程状态：${C_RESET}ahead $ahead, behind $behind"
+    echo -e "${C_INFO}是否需要 rebase：${C_RESET}$need_rebase"
+    echo -e "${C_INFO}冲突风险：${C_RESET}$conflict_risk"
     check_pr_status
     echo -e "${C_INFO}分支健康评分：${C_SUCCESS}${health}/100${C_RESET}"
     echo -e "${C_INFO}变更统计：${C_RESET}"
@@ -195,10 +194,10 @@ show_repo_status() {
 # ----------------------------
 auto_stash() {
     if has_uncommitted; then
-        echo -e "${C_WARN}检测到未提交文件，是否自动 stash？(y/n)${C_RESET}"
-        read -r ans
-        if [[ "$ans" == "y" ]]; then
-            git stash push -m "Auto stash before operation" >/dev/null
+        echo -e "${C_WARN}检测到未提交变更，是否自动 stash？(y/n，默认 n)${C_RESET}"
+        read -r -t 10 ans || ans="n"
+        if [[ "$ans" == "y" || "$ans" == "Y" ]]; then
+            git stash push -m "Auto stash by GitCLI" >/dev/null
             return 0
         fi
     fi
@@ -208,432 +207,306 @@ auto_stash() {
 auto_pop() {
     if [[ "$1" == "0" ]]; then
         echo -e "${C_INFO}正在恢复 stash...${C_RESET}"
-        git stash pop || true
+        git stash pop || echo -e "${C_WARN}stash pop 失败（可能为空）${C_RESET}"
     fi
 }
 
 # ----------------------------
-# 一键提交（原始版）
+# 智能提交系列
 # ----------------------------
-commit_changes() {
-    echo "请输入提交信息（回车使用默认）:"
-    read -r msg
-    [[ -z "$msg" ]] && msg="Update: $(date '+%Y-%m-%d %H:%M:%S')"
-
-    git add .
-    git commit -m "$msg"
-}
-
 # ----------------------------
-# 智能提交（自动 add + 摘要 + push）
+# 增强版智能提交（交互式选择文件）
 # ----------------------------
 smart_commit() {
-    echo -e "${C_INFO}🔍 执行智能提交...${C_RESET}"
+    echo -e "${C_INFO}🔍 执行智能提交（交互式）...${C_RESET}"
 
-    # 先看是否有变更
+    # 检查是否有变更
     if [[ -z "$(git status --porcelain)" ]]; then
-        echo -e "${C_WARN}当前没有任何变更，无需提交${C_RESET}"
+        echo -e "${C_WARN}当前无任何变更，无需提交${C_RESET}"
         return
     fi
 
-    git add -A
+    # 用 fzf 多选要提交的文件（支持预览 diff）
+    local selected_files=$(git status --porcelain | \
+        fzf -m --prompt="多选要提交的文件（Tab 选中，Enter 确认）: " \
+            --preview="echo {} | awk '{print \$2}' | xargs git diff --color=always" \
+            --preview-window=right:60% | \
+        awk '{print $2}')
 
+    # 如果没选任何文件，取消提交
+    if [[ -z "$selected_files" ]]; then
+        echo -e "${C_WARN}未选择任何文件，取消提交${C_RESET}"
+        return
+    fi
+
+    # 添加选中的文件
+    echo "$selected_files" | xargs git add
+
+    # 生成变更摘要
     local summary=""
-    local added modified deleted untracked
-    added=$(git status --porcelain | grep '^A ' | wc -l)
-    modified=$(git status --porcelain | grep '^ M ' | wc -l)
-    deleted=$(git status --porcelain | grep '^ D ' | wc -l)
-    untracked=$(git status --porcelain | grep '^?? ' | wc -l)
+    local added=$(git diff --cached --name-only | wc -l)
+    local modified=$(git diff --cached --name-only | grep -v '^$' | wc -l)  # 实际上 added 和 modified 都计入 staged
+    local deleted=$(git status --porcelain | grep '^D ' | wc -l || echo 0)
 
-    [[ $added -gt 0 ]] && summary+="新增:$added "
-    [[ $modified -gt 0 ]] && summary+="修改:$modified "
+    [[ $added -gt 0 ]] && summary+="新增/修改:$added "
     [[ $deleted -gt 0 ]] && summary+="删除:$deleted "
-    [[ $untracked -gt 0 ]] && summary+="未跟踪:$untracked "
 
-    [[ -z "$summary" ]] && summary="无变更"
+    [[ -z "$summary" ]] && summary="部分文件变更"
 
-    git commit -m "auto: $summary"
+    # 让用户确认或编辑 commit message
+    echo -e "${C_INFO}已暂存文件：${C_SUCCESS}${added} 个${C_RESET}"
+    echo -e "${C_INFO}建议提交信息：${C_SUCCESS}auto: $summary${C_RESET}"
+    echo -e "${C_WARN}是否现在提交？(y/n，回车使用建议消息，或直接输入自定义消息)${C_RESET}"
+    read -r user_input
 
-    echo -e "${C_INFO}⬆️ 推送中...${C_RESET}"
-    git push
-
-    echo -e "${C_SUCCESS}🎉 智能提交完成：$summary${C_RESET}"
-}
-
-# ----------------------------
-# 自动 rebase + 冲突检测
-# ----------------------------
-auto_rebase() {
-    local current
-    current=$(current_branch)
-
-    echo -e "${C_INFO}🔄 正在 rebase origin/$current...${C_RESET}"
-    if git fetch && git rebase "origin/$current"; then
-        echo -e "${C_SUCCESS}🎉 rebase 成功，无冲突${C_RESET}"
-    else
-        echo -e "${C_ERROR}⚠️ 检测到冲突，请手动解决${C_RESET}"
-        git status --porcelain | grep '^UU ' || true
-    fi
-}
-
-# ----------------------------
-# 自动创建 Pull Request（GitHub API）
-# 需要环境变量：GITHUB_TOKEN
-# ----------------------------
-create_pr() {
-    if ! command -v curl >/dev/null 2>&1; then
-        echo -e "${C_ERROR}curl 不可用，无法创建 PR${C_RESET}"
+    if [[ "$user_input" == "n" || "$user_input" == "N" ]]; then
+        echo -e "${C_WARN}提交已取消（已暂存的文件仍保留，可手动 commit）${C_RESET}"
         return
     fi
 
-    if [[ -z "$GITHUB_TOKEN" ]]; then
-        echo -e "${C_ERROR}未检测到 GITHUB_TOKEN 环境变量，无法调用 GitHub API${C_RESET}"
-        return
+    local commit_msg
+    if [[ -z "$user_input" || "$user_input" == "y" || "$user_input" == "Y" ]]; then
+        commit_msg="auto: $summary"
+    else
+        commit_msg="$user_input"
     fi
 
-    local repo_url current_branch title body response pr_url
-    repo_url=$(git config --get remote.origin.url | sed 's/.*github.com[:/]\(.*\)\.git/\1/')
-    current_branch=$(current_branch)
+    git commit -m "$commit_msg"
 
-    title="PR: $current_branch"
-    body="Auto-generated PR for branch $current_branch"
-
-    echo -e "${C_INFO}📮 创建 PR 中...${C_RESET}"
-
-    response=$(curl -s -X POST \
-        -H "Authorization: token $GITHUB_TOKEN" \
-        -H "Accept: application/vnd.github+json" \
-        -d "{\"title\":\"$title\",\"body\":\"$body\",\"head\":\"$current_branch\",\"base\":\"main\"}" \
-        "https://api.github.com/repos/$repo_url/pulls")
-
-    if echo "$response" | grep -q '"html_url"'; then
-        pr_url=$(echo "$response" | grep '"html_url"' | head -1 | sed 's/.*"html_url": "\(.*\)".*/\1/')
-        echo -e "${C_SUCCESS}🎉 PR 创建成功：$pr_url${C_RESET}"
+    # 询问是否推送
+    echo -e "${C_WARN}是否立即推送到远程？(y/n)${C_RESET}"
+    read -r push_ans
+    if [[ "$push_ans" == "y" || "$push_ans" == "Y" ]]; then
+        git push && echo -e "${C_SUCCESS}🎉 提交并推送完成！${C_RESET}"
     else
-        echo -e "${C_ERROR}❌ PR 创建失败${C_RESET}"
-        echo "$response"
+        echo -e "${C_SUCCESS}🎉 提交完成（未推送）${C_RESET}"
     fi
 }
-
 # ----------------------------
-#🟦 ① 自动识别迁移类型（detect_migration_type）
+# 文件结构智能迁移（核心升级）
 # ----------------------------
 detect_migration_type() {
-    local deleted_files untracked_files
-    deleted_files=$(git status --porcelain | grep '^ D ' | awk '{print $2}')
-    untracked_files=$(git status --porcelain | grep '^?? ' | awk '{print $2}')
+    local untracked=$(git status --porcelain | grep '^?? ' | awk '{print $2}')
 
-    if echo "$untracked_files" | grep -q '^docs/'; then
-        echo "docs-migration"
-    elif echo "$untracked_files" | grep -q '^src/'; then
-        echo "src-migration"
-    elif echo "$untracked_files" | grep -q -e '^config/' -e '\.ya\?ml$' -e '\.json$'; then
-        echo "config-migration"
-    elif echo "$untracked_files" | grep -q -e '^ci/' -e '^\.github/workflows'; then
-        echo "ci-migration"
-    elif echo "$untracked_files" | grep -q -e 'archive/' -e 'DEPRECATED'; then
-        echo "archive"
+    if [[ -z "$untracked" ]]; then
+        echo "none"
+        return
+    fi
+
+    local counts=(docs:0 src:0 config:0 ci:0 archive:0 other:0)
+
+    while IFS= read -r file; do
+        if [[ "$file" =~ ^docs/ ]]; then ((counts[0]++))
+        elif [[ "$file" =~ ^src/ ]]; then ((counts[1]++))
+        elif [[ "$file" =~ ^(config/|\.ya?ml$|\.json$) ]]; then ((counts[2]++))
+        elif [[ "$file" =~ ^(\.github/workflows|ci/) ]]; then ((counts[3]++))
+        elif [[ "$file" =~ (archive/|DEPRECATED) ]]; then ((counts[4]++))
+        else ((counts[5]++)); fi
+    done <<< "$untracked"
+
+    local max=0 max_type="refactor"
+    for i in "${!counts[@]}"; do
+        local type=${counts[i]%:*}
+        local count=${counts[i]#*:}
+        if (( count > max )); then
+            max=$count
+            case $type in
+                docs) max_type="docs-migration" ;;
+                src) max_type="src-migration" ;;
+                config) max_type="config-migration" ;;
+                ci) max_type="ci-migration" ;;
+                archive) max_type="archive" ;;
+                *) max_type="refactor" ;;
+            esac
+        fi
+    done
+
+    # 如果其他类型占比高，提示混合
+    if (( ${counts[5]#*:} > max / 2 && max > 0 )); then
+        echo "mixed-$max_type"
     else
-        echo "refactor"
+        echo "$max_type"
     fi
 }
 
-# ----------------------------
-#🟩 ② 自动判断“重构 / 归档 / 清理”
-# ----------------------------
-detect_refactor_or_archive() {
-    local untracked deleted
-
-    untracked=$(git status --porcelain | grep '^?? ' | awk '{print $2}')
-    deleted=$(git status --porcelain | grep '^ D ' | awk '{print $2}')
-
-    # ① 明确归档场景：archive/ 或 DEPRECATED
-    if echo "$untracked" | grep -E -q '(^|/)archive/|DEPRECATED'; then
-        echo "archive"
-        return
-    fi
-
-    # ② rename 检测（Git rename detection）
-    if git diff --name-status --find-renames | grep -q '^R'; then
-        echo "refactor"
-        return
-    fi
-
-    # ③ 如果 deleted + untracked 数量接近 → 结构迁移（不是 cleanup）
-    if [[ -n "$deleted" && -n "$untracked" ]]; then
-        echo "refactor"
-        return
-    fi
-
-    # ④ 默认：清理
-    echo "cleanup"
-}
-
-
-
-# ----------------------------
-#🟧 ③ 自动生成智能 commit message
-# ----------------------------
- generate_smart_commit_message() {
-    local type summary
-    type=$(detect_migration_type)
-
-    local added modified deleted
-    added=$(git status --porcelain | grep '^A ' | wc -l)
-    modified=$(git status --porcelain | grep '^ M ' | wc -l)
-    deleted=$(git status --porcelain | grep -E '^ D |^R' | wc -l)
+generate_smart_commit_message() {
+    local type=$1
+    local added=$(git status --porcelain | grep '^A ' | wc -l)
+    local deleted=$(git status --porcelain | grep -E '^ D |^R' | wc -l)
 
     case "$type" in
-        docs-migration)
-            summary="docs: migrate documentation structure ($added added, $deleted removed)"
-            ;;
-        src-migration)
-            summary="refactor(src): restructure source code modules ($added added, $deleted removed)"
-            ;;
-        config-migration)
-            summary="chore(config): reorganize configuration files ($added added, $deleted removed)"
-            ;;
-        ci-migration)
-            summary="ci: restructure CI/CD workflows ($added added, $deleted removed)"
-            ;;
-        archive)
-            summary="chore(archive): archive deprecated files ($added added, $deleted removed)"
-            ;;
-        refactor)
-            summary="refactor: structural file changes ($added added, $deleted removed)"
-            ;;
+        docs-migration|mixed-docs-migration)
+            echo "docs: migrate documentation structure ($added added, $deleted removed)" ;;
+        src-migration|mixed-src-migration)
+            echo "refactor(src): restructure source code ($added added, $deleted removed)" ;;
+        config-migration|mixed-config-migration)
+            echo "chore(config): reorganize configuration files ($added added, $deleted removed)" ;;
+        ci-migration|mixed-ci-migration)
+            echo "ci: update workflows and scripts ($added added, $deleted removed)" ;;
+        archive|mixed-archive)
+            echo "chore(archive): archive deprecated components ($added added, $deleted removed)" ;;
+        *)
+            echo "refactor: structural changes and cleanup ($added added, $deleted removed)" ;;
     esac
-
-    echo "$summary"
 }
 
-
-
-
-# ----------------------------
-#🟨 ④ 自动生成迁移报告
-# ----------------------------
-generate_migration_report() {
-    local type
-    type=$(detect_migration_type)
-
-    echo "迁移类型: $type"
-    echo "----------------------------------"
-    echo "删除文件:"
-    git status --porcelain | grep '^ D ' | awk '{print $2}'
-    echo ""
-    echo "新增文件:"
-    git status --porcelain | grep '^?? ' | awk '{print $2}'
-    echo ""
-    echo "Git rename 检测:"
-    git diff --name-status --find-renames | grep '^R' || echo "无 rename"
-    echo "----------------------------------"
-}
-
-
-
-# ----------------------------
-#✅ 第 2 步：加入智能迁移主函数（Smart File Migration）
-# ----------------------------
 smart_file_migration() {
     echo -e "${C_INFO}🔍 正在分析文件结构迁移...${C_RESET}"
 
-    local type ref_or_arch commit_msg
-    type=$(detect_migration_type)
-    ref_or_arch=$(detect_refactor_or_archive)
-    commit_msg=$(generate_smart_commit_message)
-
-    echo -e "${C_INFO}迁移类型：${C_SUCCESS}$type${C_RESET}"
-    echo -e "${C_INFO}重构/归档判断：${C_SUCCESS}$ref_or_arch${C_RESET}"
-    echo -e "${C_INFO}生成的提交信息：${C_SUCCESS}$commit_msg${C_RESET}"
-    echo ""
-
-    echo -e "${C_INFO}迁移报告:${C_RESET}"
-    generate_migration_report
-    echo ""
-
-    echo -e "${C_WARN}是否执行迁移提交？(y/n)${C_RESET}"
-    read -r ans
-    [[ "$ans" != "y" ]] && return
-
-    # 变更检查
     if [[ -z "$(git status --porcelain)" ]]; then
-        echo -e "${C_WARN}没有可提交的迁移变更${C_RESET}"
+        echo -e "${C_WARN}无变更，无法执行迁移提交${C_RESET}"
         return
     fi
+
+    local type=$(detect_migration_type)
+    [[ "$type" == "none" ]] && { echo -e "${C_WARN}无新增文件迁移迹象${C_RESET}"; return; }
+
+    local commit_msg=$(generate_smart_commit_message "$type")
+
+    echo -e "${C_INFO}检测迁移类型：${C_SUCCESS}${type}${C_RESET}"
+    echo -e "${C_INFO}建议提交信息：${C_SUCCESS}${commit_msg}${C_RESET}"
+    echo ""
+    echo -e "${C_INFO}变更预览：${C_RESET}"
+    git status --short
+
+    echo ""
+    echo -e "${C_WARN}是否执行迁移提交并推送？(y/n)${C_RESET}"
+    read -r ans
+    [[ "$ans" != "y" && "$ans" != "Y" ]] && return
 
     git add -A
     git commit -m "$commit_msg"
     git push
 
-    echo -e "${C_SUCCESS}🎉 文件结构迁移提交完成${C_RESET}"
+    echo -e "${C_SUCCESS}🎉 文件结构迁移提交完成！${C_RESET}"
 }
 
-
-
 # ----------------------------
-# 文档迁移自动提交（根 → docs/）
+# 其他功能
 # ----------------------------
-auto_commit_docs_migration() {
-    echo -e "${C_INFO}🔍 检查文档迁移状态...${C_RESET}"
+auto_rebase() {
+    echo -e "${C_INFO}🔄 正在 rebase origin/$CURRENT_BRANCH...${C_RESET}"
+    git fetch && git rebase "origin/$CURRENT_BRANCH" && echo -e "${C_SUCCESS}rebase 成功${C_RESET}" || {
+        echo -e "${C_ERROR}rebase 冲突，请手动解决${C_RESET}"
+        git status --porcelain | grep '^UU ' || true
+    }
+}
 
-    local deleted_count untracked_docs
-    deleted_count=$(git status --porcelain | grep '^ D ' | wc -l)
-    untracked_docs=$(git status --porcelain | grep '^?? docs/' | wc -l)
+create_pr() {
+    [[ -z "$REPO_PATH" ]] && { echo -e "${C_ERROR}非 GitHub 仓库${C_RESET}"; return; }
+    [[ -z "${GITHUB_TOKEN:-}" ]] && { echo -e "${C_ERROR}请设置 GITHUB_TOKEN 环境变量${C_RESET}"; return; }
 
-    if [[ $deleted_count -eq 0 && $untracked_docs -eq 0 ]]; then
-        echo -e "${C_WARN}未检测到文档迁移相关变更，无需自动提交${C_RESET}"
-        return
+    local title="feat: updates from branch $CURRENT_BRANCH"
+    local body="Auto-generated PR from GitCLI tool."
+
+    echo -e "${C_INFO}📮 创建 PR（base: $DEFAULT_BRANCH）...${C_RESET}"
+
+    local response=$(curl -s -X POST $GH_HEADER \
+        -H "Accept: application/vnd.github+json" \
+        -d "{\"title\":\"$title\",\"body\":\"$body\",\"head\":\"$CURRENT_BRANCH\",\"base\":\"$DEFAULT_BRANCH\"}" \
+        "https://api.github.com/repos/$REPO_PATH/pulls")
+
+    if echo "$response" | grep -q '"html_url"'; then
+        local pr_url=$(echo "$response" | grep '"html_url"' | head -1 | sed 's/.*"html_url": "\(.*\)".*/\1/')
+        echo -e "${C_SUCCESS}🎉 PR 创建成功：$pr_url${C_RESET}"
+    else
+        echo -e "${C_ERROR}PR 创建失败${C_RESET}"
+        echo "$response"
     fi
-
-    echo -e "${C_INFO}📁 检测到文档迁移：${deleted_count} 个删除，${untracked_docs} 个新增${C_RESET}"
-
-    echo -e "${C_INFO}➡️ 添加 docs/ 下的新文档...${C_RESET}"
-    git add docs/
-
-    echo -e "${C_INFO}➡️ 标记旧文档删除 (git add -u)...${C_RESET}"
-    git add -u
-
-    echo -e "${C_INFO}📝 创建提交...${C_RESET}"
-    git commit -m "docs: restructure documentation into docs/ directory"
-
-    echo -e "${C_INFO}⬆️ 推送到远程...${C_RESET}"
-    git push
-
-    echo -e "${C_SUCCESS}🎉 文档迁移自动提交完成！${C_RESET}"
 }
 
-# ----------------------------
-# 本地分支选择器（fzf + log 预览）
-# ----------------------------
 select_branch() {
-    git branch --format='%(refname:short)' \
-        | fzf --prompt="选择分支: " \
-              --preview="git log --oneline --graph --decorate --color=always {}" \
-              --preview-window=right:60%
+    git branch --sort=-committerdate --format='%(refname:short)' |
+        fzf --prompt="选择本地分支: " --preview="git log --oneline --graph --decorate --color=always {}" --preview-window=right:60%
 }
 
 switch_branch() {
-    if detect_conflicts; then
-        echo -e "${C_ERROR}请先解决冲突再切换分支。${C_RESET}"
-        return
-    fi
-
-    target=$(select_branch)
+    detect_conflicts && return
+    local target=$(select_branch)
     [[ -n "$target" ]] && git checkout "$target"
 }
 
-# ----------------------------
-# 远程分支选择器（fzf + log 预览）
-# ----------------------------
-get_remote_branches() {
-    git fetch --quiet
-    git ls-remote --heads origin | while read -r hash ref; do
-        branch="${ref#refs/heads/}"
-        echo "$branch"
-    done
-}
-
 select_remote_branch() {
-    get_remote_branches \
-        | fzf --prompt="选择远程分支: " \
-              --preview="git log --oneline --graph --decorate --color=always origin/{}" \
-              --preview-window=right:60%
+    git fetch --quiet
+    git ls-remote --heads origin | awk '{print $2}' | sed 's@refs/heads/@@' |
+        fzf --prompt="选择远程分支: " --preview="git log --oneline --graph --decorate --color=always origin/{}" --preview-window=right:60%
 }
 
 pull_remote_branch() {
-    branch=$(select_remote_branch)
+    local branch=$(select_remote_branch)
     [[ -z "$branch" ]] && return
-
-    if git branch --list | grep -q "$branch"; then
-        git checkout "$branch"
-        git pull origin "$branch"
+    if git branch --list | grep -q "^$branch\$"; then
+        git checkout "$branch" && git pull
     else
         git checkout -b "$branch" "origin/$branch"
     fi
 }
 
-# ----------------------------
-# 推送到远程新分支（阶段性备份）
-# ----------------------------
 push_new_branch() {
-    current=$(current_branch)
-    timestamp=$(date '+%Y%m%d-%H%M')
-    default="backup/$current/$timestamp"
-
+    local timestamp=$(date '+%Y%m%d-%H%M')
+    local default="backup/$CURRENT_BRANCH/$timestamp"
     echo "输入新分支名（回车使用默认：$default）："
     read -r name
     [[ -z "$name" ]] && name="$default"
-
     git push origin HEAD:"$name"
-    echo -e "${C_SUCCESS}远程已创建分支：$name${C_RESET}"
+    echo -e "${C_SUCCESS}已推送到远程分支：$name${C_RESET}"
 }
 
 # ----------------------------
-# 推送菜单（fzf）
+# 推送菜单
 # ----------------------------
 push_menu() {
-    if detect_conflicts; then
-        echo -e "${C_ERROR}存在冲突文件，请先解决冲突。${C_RESET}"
-        return
-    fi
+    detect_conflicts && { echo -e "${C_ERROR}存在冲突，请先解决${C_RESET}"; return; }
 
-    choice=$(printf "普通推送\n强制推送\n一键提交 + 普通推送\n一键提交 + 强制推送\n推送到远程新分支（阶段性备份）\n智能提交 (auto add + commit + push)\n文档迁移自动提交" \
-        | fzf --prompt="选择推送操作: ")
+    local choice=$(printf "普通推送\n强制推送（--force-with-lease）\n智能提交 + 推送\n推送到新分支（备份）\n智能文件结构迁移并推送\n返回主菜单" |
+        fzf --prompt="选择推送操作: ")
 
-    auto_stash
-    did_stash=$?
+    local did_stash=1
+    auto_stash && did_stash=0
 
     case "$choice" in
         "普通推送") git push ;;
-        "强制推送") git push --force-with-lease ;;
-        "一键提交 + 普通推送") commit_changes; git push ;;
-        "一键提交 + 强制推送") commit_changes; git push --force-with-lease ;;
-        "推送到远程新分支（阶段性备份）") push_new_branch ;;
-        "智能提交 (auto add + commit + push)") smart_commit ;;
-        "文档迁移自动提交") auto_commit_docs_migration ;;
+        "强制推送（--force-with-lease）") git push --force-with-lease ;;
+        "智能提交 + 推送") smart_commit ;;
+        "推送到新分支（备份）") push_new_branch ;;
+        "智能文件结构迁移并推送") smart_file_migration ;;
+        *) auto_pop "$did_stash"; return ;;
     esac
 
     auto_pop "$did_stash"
 }
 
 # ----------------------------
-# 主菜单（fzf）
+# 主菜单
 # ----------------------------
 main_menu() {
     while true; do
         clear
         show_repo_status
-
         echo ""
-        echo -e "${C_SUCCESS} Git 菜单工具（WSL + fzf 专业版）${C_RESET}"
+        echo -e "${C_SUCCESS}🚀 GitCLI 专业工具 v2.0${C_RESET}"
         echo ""
 
-        choice=$(printf "拉取最新代码\n推送选项菜单\n远程分支浏览 + 拉取\n切换本地分支（搜索）\n查看状态\n查看日志\n自动 rebase + 冲突检测\n创建 Pull Request (auto PR)\n分支健康评分\n文件结构智能迁移（Smart File Migration）\n退出" \
-            | fzf --prompt="选择操作: ")
+        local choice=$(printf "拉取最新代码\n推送选项菜单\n远程分支浏览 + 拉取\n切换本地分支\n查看详细状态\n查看日志 (graph)\n自动 rebase\n创建 Pull Request\n分支健康评分\n智能文件结构迁移\n退出" |
+            fzf --prompt="选择操作 > ")
 
         case "$choice" in
             "拉取最新代码") git pull ;;
             "推送选项菜单") push_menu ;;
             "远程分支浏览 + 拉取") pull_remote_branch ;;
-            "切换本地分支（搜索）") switch_branch ;;
-            "查看状态") git status ;;
-            "查看日志") git log --oneline --graph --decorate --all -20 ;;
-            "自动 rebase + 冲突检测") auto_rebase ;;
-            "创建 Pull Request (auto PR)") create_pr ;;
-            "分支健康评分") 
-                echo -e "${C_INFO}当前分支健康评分：${C_SUCCESS}$(branch_health_score)/100${C_RESET}"
-                ;;
-            "文件结构智能迁移（Smart File Migration）")
-                smart_file_migration
-                ;;
-            "退出") exit 0 ;;
+            "切换本地分支") switch_branch ;;
+            "查看详细状态") git status ;;
+            "查看日志 (graph)") git log --oneline --graph --decorate --all -20 ;;
+            "自动 rebase") auto_rebase ;;
+            "创建 Pull Request") create_pr ;;
+            "分支健康评分") echo -e "${C_INFO}当前健康评分：${C_SUCCESS}$(branch_health_score)/100${C_RESET}" ;;
+            "智能文件结构迁移") smart_file_migration ;;
+            "退出") echo -e "${C_SUCCESS}再见！${C_RESET}"; exit 0 ;;
         esac
 
-        echo "按 Enter 继续..."
-        read -r
+        echo ""
+        read -n 1 -s -r -p "按任意键继续..."
     done
 }
-
 
 main_menu
