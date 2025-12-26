@@ -19,11 +19,14 @@
 | CHANGES_SUMMARY.md | docs/core/LOG-CHANGES-summary-v1.md | **Keep** | **85/100** | 变更摘要文档，记录 QueryAllLedgerData 功能演进，信息密度高 |
 | **Guide 开发指南** |
 | README.md | docs/guide/GDE-README-v1.md | **Keep** | **95/100** | 项目入口文档，新手必读，业务流程与技术栈描述准确 |
-| DEVELOPMENT_GUIDE.md | docs/guide/GDE-DEVELOPMENT-guide-v1.md | **Keep** | **88/100** | 二次开发指南，开发者必备，代码示例具体可用 |
+| DEVELOPMENT_GUIDE.md | docs/guide/GDE-DEVELOPMENT-v1.md | **Rename** | **88/100** | 二次开发指南，开发者必备，代码示例具体可用，去除冗余后缀 |
 | QUERY_COMPARISON.md | docs/guide/GDE-QUERY-comparison-v1.md | **Keep** | **85/100** | 查询功能对比表，便于功能选型，表格清晰 |
-| PROJECT_STRUCTURE.md | docs/guide/GDE-STRUCTURE-v1.md | **Keep** | **82/100** | 项目结构分析，架构概览，目录说明完整 |
+| GDE-STRUCTURE-v1.md | docs/guide/GDE-README-v1.md | **Merge** | **82/100** | 项目结构分析并入 README 增强版，形成完整的项目入门文档 |
 | QUICK_START.md | docs/guide/GDE-QUICKSTART-v1.md | **Keep** | **90/100** | 快速开始指南，新用户入门，API 示例实用 |
 | dev.md | docs/guide/GDE-LOCALDEV-v1.md | **Keep** | **75/100** | 本地开发环境配置，部分步骤需更新 |
+| **新增文档** |
+| - | docs/core/LOG-ORDER-fsm-v1.md | **New** | **95/100** | MVP1 订单状态机文档，填补核心逻辑缺失 |
+| - | docs/core/LOG-DATA-dictionary-v1.md | **New** | **92/100** | 数据字典文档，统一前后端数据结构定义 |
 | **Ops 运维文档** |
 | BUG_FIXES.md | docs/ops/OPS-BUGFIX-v1.md | **Keep** | **78/100** | Bug 修复记录，运维参考，部分建议待实践 |
 | diagnostic_manual_final.md | docs/ops/OPS-DIAGNOSTIC-fabric-v1.md | **Keep** | **82/100** | Fabric 网络诊断手册，运维工具，命令实用 |
@@ -69,15 +72,15 @@
 
 | 类别 | 数量 | 占比 |
 |------|------|------|
-| Core-Logic 文档 | 6 | 26% |
-| Guide 文档 | 6 | 26% |
-| Ops 文档 | 4 | 17% |
-| Archive 文档 | 3 | 13% |
+| Core-Logic 文档 | 8 | 32% |
+| Guide 文档 | 5 | 20% |
+| Ops 文档 | 4 | 16% |
+| Archive 文档 | 3 | 12% |
 | Reference 数据 | 1 | 4% |
 | 删除文档 | 1 | 4% |
 | 合并文档 | 1 | 4% |
-| **有效文档总数** | **20** | **87%** |
-| **归档/删除文档** | **4** | **17%** |
+| **有效文档总数** | **22** | **88%** |
+| **归档/删除文档** | **4** | **16%** |
 
 ---
 
