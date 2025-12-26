@@ -310,10 +310,166 @@ create_pr() {
         pr_url=$(echo "$response" | grep '"html_url"' | head -1 | sed 's/.*"html_url": "\(.*\)".*/\1/')
         echo -e "${C_SUCCESS}🎉 PR 创建成功：$pr_url${C_RESET}"
     else
-        echo -e "${C_ERROR}❌ PR 创建失败${CRESET}"
+        echo -e "${C_ERROR}❌ PR 创建失败${C_RESET}"
         echo "$response"
     fi
 }
+
+# ----------------------------
+#🟦 ① 自动识别迁移类型（detect_migration_type）
+# ----------------------------
+detect_migration_type() {
+    local deleted_files untracked_files
+    deleted_files=$(git status --porcelain | grep '^ D ' | awk '{print $2}')
+    untracked_files=$(git status --porcelain | grep '^?? ' | awk '{print $2}')
+
+    if echo "$untracked_files" | grep -q '^docs/'; then
+        echo "docs-migration"
+    elif echo "$untracked_files" | grep -q '^src/'; then
+        echo "src-migration"
+    elif echo "$untracked_files" | grep -q -e '^config/' -e '\.ya\?ml$' -e '\.json$'; then
+        echo "config-migration"
+    elif echo "$untracked_files" | grep -q -e '^ci/' -e '^\.github/workflows'; then
+        echo "ci-migration"
+    elif echo "$untracked_files" | grep -q -e 'archive/' -e 'DEPRECATED'; then
+        echo "archive"
+    else
+        echo "refactor"
+    fi
+}
+
+# ----------------------------
+#🟩 ② 自动判断“重构 / 归档 / 清理”
+# ----------------------------
+detect_refactor_or_archive() {
+    local untracked deleted
+
+    untracked=$(git status --porcelain | grep '^?? ' | awk '{print $2}')
+    deleted=$(git status --porcelain | grep '^ D ' | awk '{print $2}')
+
+    # ① 明确归档场景：archive/ 或 DEPRECATED
+    if echo "$untracked" | grep -E -q '(^|/)archive/|DEPRECATED'; then
+        echo "archive"
+        return
+    fi
+
+    # ② rename 检测（Git rename detection）
+    if git diff --name-status --find-renames | grep -q '^R'; then
+        echo "refactor"
+        return
+    fi
+
+    # ③ 如果 deleted + untracked 数量接近 → 结构迁移（不是 cleanup）
+    if [[ -n "$deleted" && -n "$untracked" ]]; then
+        echo "refactor"
+        return
+    fi
+
+    # ④ 默认：清理
+    echo "cleanup"
+}
+
+
+
+# ----------------------------
+#🟧 ③ 自动生成智能 commit message
+# ----------------------------
+ generate_smart_commit_message() {
+    local type summary
+    type=$(detect_migration_type)
+
+    local added modified deleted
+    added=$(git status --porcelain | grep '^A ' | wc -l)
+    modified=$(git status --porcelain | grep '^ M ' | wc -l)
+    deleted=$(git status --porcelain | grep -E '^ D |^R' | wc -l)
+
+    case "$type" in
+        docs-migration)
+            summary="docs: migrate documentation structure ($added added, $deleted removed)"
+            ;;
+        src-migration)
+            summary="refactor(src): restructure source code modules ($added added, $deleted removed)"
+            ;;
+        config-migration)
+            summary="chore(config): reorganize configuration files ($added added, $deleted removed)"
+            ;;
+        ci-migration)
+            summary="ci: restructure CI/CD workflows ($added added, $deleted removed)"
+            ;;
+        archive)
+            summary="chore(archive): archive deprecated files ($added added, $deleted removed)"
+            ;;
+        refactor)
+            summary="refactor: structural file changes ($added added, $deleted removed)"
+            ;;
+    esac
+
+    echo "$summary"
+}
+
+
+
+
+# ----------------------------
+#🟨 ④ 自动生成迁移报告
+# ----------------------------
+generate_migration_report() {
+    local type
+    type=$(detect_migration_type)
+
+    echo "迁移类型: $type"
+    echo "----------------------------------"
+    echo "删除文件:"
+    git status --porcelain | grep '^ D ' | awk '{print $2}'
+    echo ""
+    echo "新增文件:"
+    git status --porcelain | grep '^?? ' | awk '{print $2}'
+    echo ""
+    echo "Git rename 检测:"
+    git diff --name-status --find-renames | grep '^R' || echo "无 rename"
+    echo "----------------------------------"
+}
+
+
+
+# ----------------------------
+#✅ 第 2 步：加入智能迁移主函数（Smart File Migration）
+# ----------------------------
+smart_file_migration() {
+    echo -e "${C_INFO}🔍 正在分析文件结构迁移...${C_RESET}"
+
+    local type ref_or_arch commit_msg
+    type=$(detect_migration_type)
+    ref_or_arch=$(detect_refactor_or_archive)
+    commit_msg=$(generate_smart_commit_message)
+
+    echo -e "${C_INFO}迁移类型：${C_SUCCESS}$type${C_RESET}"
+    echo -e "${C_INFO}重构/归档判断：${C_SUCCESS}$ref_or_arch${C_RESET}"
+    echo -e "${C_INFO}生成的提交信息：${C_SUCCESS}$commit_msg${C_RESET}"
+    echo ""
+
+    echo -e "${C_INFO}迁移报告:${C_RESET}"
+    generate_migration_report
+    echo ""
+
+    echo -e "${C_WARN}是否执行迁移提交？(y/n)${C_RESET}"
+    read -r ans
+    [[ "$ans" != "y" ]] && return
+
+    # 变更检查
+    if [[ -z "$(git status --porcelain)" ]]; then
+        echo -e "${C_WARN}没有可提交的迁移变更${C_RESET}"
+        return
+    fi
+
+    git add -A
+    git commit -m "$commit_msg"
+    git push
+
+    echo -e "${C_SUCCESS}🎉 文件结构迁移提交完成${C_RESET}"
+}
+
+
 
 # ----------------------------
 # 文档迁移自动提交（根 → docs/）
@@ -453,7 +609,7 @@ main_menu() {
         echo -e "${C_SUCCESS} Git 菜单工具（WSL + fzf 专业版）${C_RESET}"
         echo ""
 
-        choice=$(printf "拉取最新代码\n推送选项菜单\n远程分支浏览 + 拉取\n切换本地分支（搜索）\n查看状态\n查看日志\n自动 rebase + 冲突检测\n创建 Pull Request (auto PR)\n分支健康评分\n退出" \
+        choice=$(printf "拉取最新代码\n推送选项菜单\n远程分支浏览 + 拉取\n切换本地分支（搜索）\n查看状态\n查看日志\n自动 rebase + 冲突检测\n创建 Pull Request (auto PR)\n分支健康评分\n文件结构智能迁移（Smart File Migration）\n退出" \
             | fzf --prompt="选择操作: ")
 
         case "$choice" in
@@ -465,7 +621,12 @@ main_menu() {
             "查看日志") git log --oneline --graph --decorate --all -20 ;;
             "自动 rebase + 冲突检测") auto_rebase ;;
             "创建 Pull Request (auto PR)") create_pr ;;
-            "分支健康评分") echo -e "${C_INFO}当前分支健康评分：${C_SUCCESS}$(branch_health_score)/100${C_RESET}" ;;
+            "分支健康评分") 
+                echo -e "${C_INFO}当前分支健康评分：${C_SUCCESS}$(branch_health_score)/100${C_RESET}"
+                ;;
+            "文件结构智能迁移（Smart File Migration）")
+                smart_file_migration
+                ;;
             "退出") exit 0 ;;
         esac
 
@@ -473,5 +634,6 @@ main_menu() {
         read -r
     done
 }
+
 
 main_menu
