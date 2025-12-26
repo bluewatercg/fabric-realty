@@ -154,7 +154,7 @@ check_pr_status() {
 }
 
 show_repo_status() {
-    local added modified deleted untrackedQQ
+    local added modified deleted untracked
     added=$(git status --porcelain 2>/dev/null | grep -c '^A ' || echo 0)
     modified=$(git status --porcelain 2>/dev/null | grep -c '^ M' || echo 0)
     deleted=$(git status --porcelain 2>/dev/null | grep -c '^ D ' || echo 0)
@@ -222,6 +222,13 @@ auto_pop() {
 # 增强版智能提交（交互式选择文件）
 # ----------------------------
 smart_commit() {
+    if [[ -n "$(git stash list | grep 'Auto stash by GitCLI' | tail -1)" ]]; then
+        echo -e "${C_WARN}检测到最近的 stash 是工具自动创建的，可能你刚回答了 y${C_RESET}"
+        echo -e "${C_WARN}建议直接回答 n 不 stash，才能正常进行交互式提交${C_RESET}"
+        echo -e "${C_INFO}是否立即恢复 stash 并继续交互式提交？(y/n)${C_RESET}"
+        read -r ans
+        [[ "$ans" == "y" ]] && git stash pop
+    fi
     echo -e "${C_INFO}🔍 执行智能提交（交互式）...${C_RESET}"
 
     # 检查是否有变更
@@ -465,8 +472,17 @@ push_menu() {
     local choice=$(printf "普通推送\n强制推送（--force-with-lease）\n智能提交 + 推送\n推送到新分支（备份）\n智能文件结构迁移并推送\n返回主菜单" |
         fzf --prompt="选择推送操作: ")
 
+    # 逻辑优化：如果是提交类操作，不应该执行 auto_stash
+    local needs_stash=1
+    if [[ "$choice" == "智能提交 + 推送" || "$choice" == "智能文件结构迁移并推送" || "$choice" == "返回主菜单" ]]; then
+        needs_stash=0
+    fi
+
     local did_stash=1
-    auto_stash && did_stash=0
+    # 只有在需要 stash 且用户同意时才执行
+    if [[ "$needs_stash" -eq 1 ]]; then
+        auto_stash && did_stash=0
+    fi
 
     case "$choice" in
         "普通推送") git push ;;
@@ -474,10 +490,11 @@ push_menu() {
         "智能提交 + 推送") smart_commit ;;
         "推送到新分支（备份）") push_new_branch ;;
         "智能文件结构迁移并推送") smart_file_migration ;;
-        *) auto_pop "$did_stash"; return ;;
+        *) [[ "$did_stash" -eq 0 ]] && auto_pop 0; return ;;
     esac
 
-    auto_pop "$did_stash"
+    # 如果之前自动 stash 了，现在恢复
+    [[ "$did_stash" -eq 0 ]] && auto_pop 0
 }
 
 # ----------------------------

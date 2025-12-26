@@ -220,7 +220,8 @@ graph TD
             P5[Peer0.platform]
         end
         
-        ClientApp[Client App] -->|Propose Tx (via Fabric Gateway)| P1 & P3
+        ClientApp[Client App] -->|Propose Tx (via Fabric Gateway)| P1
+        ClientApp[Client App] -->|Propose Tx (via Fabric Gateway)| P3
         P1 <-.->|Gossip| P2 & P3 & P4 & P5
         P2 <-.->|Gossip| P3 & P4 & P5
         P3 <-.->|Gossip| P4 & P5
