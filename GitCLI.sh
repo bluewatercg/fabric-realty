@@ -216,81 +216,147 @@ auto_pop() {
 }
 
 # ----------------------------
-# 智能提交系列
+# DeepSeek AI 提交助手
 # ----------------------------
+generate_ai_commit() {
+    # 1. 检查环境变量
+    if [[ -z "${DEEPSEEK_API_KEY:-}" ]]; then
+        echo -e "${C_ERROR}❌ 未检测到 DEEPSEEK_API_KEY 环境变量${C_RESET}"
+        echo -e "${C_INFO}请在终端执行: export DEEPSEEK_API_KEY='你的sk-key'${C_RESET}"
+        return 1
+    fi
+
+    # 2. 获取暂存区的 Diff
+    # 截取前 4000 字符防止超出 token 限制，足够 AI 理解上下文
+    local diff_content=$(git diff --cached | head -c 4000)
+    
+    if [[ -z "$diff_content" ]]; then
+        echo -e "${C_WARN}⚠️ 暂存区为空，请先 git add 文件${C_RESET}"
+        return 1
+    fi
+
+    echo -e "${C_INFO}🤖 正在请求 DeepSeek 分析代码变更...${C_RESET}"
+
+    # 3. 构造 JSON Payload (利用 jq 安全处理转义字符)
+    local system_prompt="你是一个资深开发者。请根据 git diff 生成一个符合 Conventional Commits 规范的英文 Commit Message（如 feat: add new feature）。要求：1. 仅输出 Message 本身，不要Markdown，不要解释。 2. 只有一行总结。"
+    
+    local payload=$(jq -n \
+                  --arg sys "$system_prompt" \
+                  --arg user "$diff_content" \
+                  '{
+                    model: "deepseek-chat",
+                    messages: [
+                      {role: "system", content: $sys},
+                      {role: "user", content: $user}
+                    ],
+                    temperature: 0.7,
+                    stream: false
+                  }')
+
+    # 4. 调用 API
+    local response=$(curl -s -X POST "https://api.deepseek.com/chat/completions" \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer $DEEPSEEK_API_KEY" \
+        -d "$payload")
+
+    # 5. 解析结果
+    local ai_msg=$(echo "$response" | jq -r '.choices[0].message.content' 2>/dev/null)
+
+    # 错误处理
+    if [[ -z "$ai_msg" || "$ai_msg" == "null" ]]; then
+        echo -e "${C_ERROR}❌ API 调用失败或返回为空${C_RESET}"
+        # 调试用：打印错误信息（可选）
+        # echo "$response"
+        return 1
+    fi
+
+    # 6. 返回结果给调用者
+    echo "$ai_msg"
+    return 0
+}
 # ----------------------------
-# 增强版智能提交（交互式选择文件）
+# 增强版智能提交（集成 AI）
 # ----------------------------
 smart_commit() {
+    # ... (保留原有的 stash 检查逻辑) ...
     if [[ -n "$(git stash list | grep 'Auto stash by GitCLI' | tail -1)" ]]; then
-        echo -e "${C_WARN}检测到最近的 stash 是工具自动创建的，可能你刚回答了 y${C_RESET}"
-        echo -e "${C_WARN}建议直接回答 n 不 stash，才能正常进行交互式提交${C_RESET}"
-        echo -e "${C_INFO}是否立即恢复 stash 并继续交互式提交？(y/n)${C_RESET}"
+        echo -e "${C_WARN}检测到最近的 stash 是工具自动创建的${C_RESET}"
+        echo -e "${C_INFO}是否立即恢复 stash 并继续？(y/n)${C_RESET}"
         read -r ans
         [[ "$ans" == "y" ]] && git stash pop
     fi
-    echo -e "${C_INFO}🔍 执行智能提交（交互式）...${C_RESET}"
 
     # 检查是否有变更
     if [[ -z "$(git status --porcelain)" ]]; then
-        echo -e "${C_WARN}当前无任何变更，无需提交${C_RESET}"
+        echo -e "${C_WARN}当前工作区无任何变更，无需提交${C_RESET}"
         return
     fi
 
-    # 用 fzf 多选要提交的文件（支持预览 diff）
+    echo -e "${C_INFO}🔍 准备提交...${C_RESET}"
+
+    # 1. 选择文件 (fzf)
     local selected_files=$(git status --porcelain | \
         fzf -m --prompt="多选要提交的文件（Tab 选中，Enter 确认）: " \
             --preview="echo {} | awk '{print \$2}' | xargs git diff --color=always" \
             --preview-window=right:60% | \
         awk '{print $2}')
 
-    # 如果没选任何文件，取消提交
     if [[ -z "$selected_files" ]]; then
-        echo -e "${C_WARN}未选择任何文件，取消提交${C_RESET}"
+        echo -e "${C_WARN}未选择文件，取消操作${C_RESET}"
         return
     fi
 
-    # 添加选中的文件
+    # 添加文件
     echo "$selected_files" | xargs git add
 
-    # 生成变更摘要
-    local summary=""
-    local added=$(git diff --cached --name-only | wc -l)
-    local modified=$(git diff --cached --name-only | grep -v '^$' | wc -l)  # 实际上 added 和 modified 都计入 staged
-    local deleted=$(git status --porcelain | grep '^D ' | wc -l || echo 0)
+    # 2. 选择提交信息生成方式
+    local commit_msg=""
+    
+    echo -e "${C_MENU}请选择 Commit Message 来源：${C_RESET}"
+    local msg_source=$(printf "✨ AI 自动生成 (DeepSeek)\n📝 手动输入\n🔙 取消" | fzf --prompt="选择方式 > ")
 
-    [[ $added -gt 0 ]] && summary+="新增/修改:$added "
-    [[ $deleted -gt 0 ]] && summary+="删除:$deleted "
-
-    [[ -z "$summary" ]] && summary="部分文件变更"
-
-    # 让用户确认或编辑 commit message
-    echo -e "${C_INFO}已暂存文件：${C_SUCCESS}${added} 个${C_RESET}"
-    echo -e "${C_INFO}建议提交信息：${C_SUCCESS}auto: $summary${C_RESET}"
-    echo -e "${C_WARN}是否现在提交？(y/n，回车使用建议消息，或直接输入自定义消息)${C_RESET}"
-    read -r user_input
-
-    if [[ "$user_input" == "n" || "$user_input" == "N" ]]; then
-        echo -e "${C_WARN}提交已取消（已暂存的文件仍保留，可手动 commit）${C_RESET}"
+    if [[ "$msg_source" == "✨ AI 自动生成 (DeepSeek)" ]]; then
+        # 调用 AI 函数
+        local ai_result=$(generate_ai_commit)
+        if [[ $? -eq 0 ]]; then
+            echo -e "${C_SUCCESS}AI 建议: ${ai_result}${C_RESET}"
+            echo -e "${C_INFO}按 Enter 采用，输入 e 编辑，输入 n 取消${C_RESET}"
+            read -r confirm
+            if [[ "$confirm" == "e" || "$confirm" == "E" ]]; then
+                commit_msg="$ai_result"
+                # 打开编辑器让用户微调
+                git commit -e -m "$commit_msg"
+                return # commit -e 会自己处理后续，这里直接返回即可
+            elif [[ "$confirm" == "n" || "$confirm" == "N" ]]; then
+                echo -e "${C_WARN}已取消提交${C_RESET}"
+                git reset # 撤销 add
+                return
+            else
+                commit_msg="$ai_result"
+            fi
+        else
+            echo -e "${C_WARN}转为手动输入...${C_RESET}"
+            read -r -p "请输入提交信息: " commit_msg
+        fi
+    elif [[ "$msg_source" == "📝 手动输入" ]]; then
+        read -r -p "请输入提交信息: " commit_msg
+    else
+        echo -e "${C_WARN}操作已取消${C_RESET}"
+        git reset
         return
     fi
 
-    local commit_msg
-    if [[ -z "$user_input" || "$user_input" == "y" || "$user_input" == "Y" ]]; then
-        commit_msg="auto: $summary"
-    else
-        commit_msg="$user_input"
-    fi
-
-    git commit -m "$commit_msg"
-
-    # 询问是否推送
-    echo -e "${C_WARN}是否立即推送到远程？(y/n)${C_RESET}"
-    read -r push_ans
-    if [[ "$push_ans" == "y" || "$push_ans" == "Y" ]]; then
-        git push && echo -e "${C_SUCCESS}🎉 提交并推送完成！${C_RESET}"
-    else
-        echo -e "${C_SUCCESS}🎉 提交完成（未推送）${C_RESET}"
+    # 3. 执行提交
+    if [[ -n "$commit_msg" ]]; then
+        git commit -m "$commit_msg"
+        echo -e "${C_SUCCESS}🎉 提交成功！${C_RESET}"
+        
+        # 询问推送
+        echo -e "${C_WARN}是否立即推送到远程？(y/n)${C_RESET}"
+        read -r push_ans
+        if [[ "$push_ans" == "y" || "$push_ans" == "Y" ]]; then
+            git push && echo -e "${C_SUCCESS}🚀 推送完成！${C_RESET}"
+        fi
     fi
 }
 # ----------------------------
