@@ -1,5 +1,13 @@
 # Chaincode 修改方案：数字运单管理系统
 
+> ⚠️ **此文档已归档，仅供参考**
+
+> **废弃原因**：本方案描述的 Waybill 单资产模型已被当前 Order/Shipment 双资产模型替代。
+>
+> **替代方案**：请参考 `docs/core/LOG-CORE-arch-v1.md` 了解当前系统架构。
+
+---
+
 ## 1. 核心目标
 将现有的房产交易逻辑（RealEstate）替换为数字运单（Digital Waybill）逻辑，实现运单的**签发（Issuance）**、**确认（Confirmation）**和**全流程状态追踪**。
 

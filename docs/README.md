@@ -82,9 +82,11 @@ stateDiagram-v2
 docs/
 ├── README.md                         # 文档系统入口（含业务流图）
 ├── MAPPING-LEDGER.md                 # 文档映射与重构记录表
+├── REFACTORING-ROADMAP.md            # 重构路线图与缺口分析
 │
 ├── core/                             # Core-Logic 核心逻辑文档
 │   ├── LOG-CORE-arch-v1.md           # 系统架构与技术栈（39KB）
+│   ├── LOG-CONCEPT-worldstate-v1.md  # World State vs Ledger 概念说明（新增）
 │   ├── LOG-IMPLEMENTATION-queryall-v1.md  # QueryAllLedgerData 实现总结
 │   ├── LOG-LEDGER-history-v1.md      # 账本历史查询详细说明
 │   ├── LOG-CALLFLOW-e2e-v1.md        # 端到端调用链路分析
@@ -174,6 +176,7 @@ docs/
 | 文档 | 覆盖内容 | 大小 |
 |------|----------|------|
 | LOG-CORE-arch-v1.md | 系统架构图、技术栈、API接口、数据模型、部署配置 | 39KB |
+| LOG-CONCEPT-worldstate-v1.md | World State vs Ledger 概念说明、数据流转机制 | **新增** |
 | LOG-IMPLEMENTATION-queryall-v1.md | QueryAllLedgerData 功能实现细节 | 7.6KB |
 | LOG-LEDGER-history-v1.md | 账本历史查询 API、数据结构、性能考量 | 12KB |
 | LOG-CALLFLOW-e2e-v1.md | Vue→API→Service→Chaincode 完整调用链路 | 7.5KB |
@@ -223,6 +226,26 @@ docs/
 
 ---
 
-**文档版本**: v1.0  
-**最后更新**: 2024-12-26  
-**重构状态**: ✅ 已完成
+## 📊 重构完成状态
+
+### MVP1 节点覆盖度
+
+| 节点 | 覆盖状态 | 核心文档 |
+|------|---------|---------|
+| 采购单 (PO) | ✅ 100% | LOG-CORE-arch-v1.md, LOG-SERVICE-logic-v1.md |
+| 签收 (Receipt) | ✅ 100% | LOG-CORE-arch-v1.md, LOG-CALLFLOW-e2e-v1.md |
+| 世界状态 (World State) | ✅ 100% | LOG-CONCEPT-worldstate-v1.md (新增) |
+| 账本 (Ledger) | ✅ 100% | LOG-LEDGER-history-v1.md, LOG-IMPLEMENTATION-queryall-v1.md |
+
+### 关键改进
+
+1. **新增 World State 概念文档** - 填补 MVP1 核心节点覆盖缺口
+2. **清理根目录重复文件** - 统一文档结构，消除混淆
+3. **完善文档映射表** - 记录重构决策，支持追溯治理
+4. **标准化命名规范** - 采用 `[分类码]-[模块名]-[版本号]` 格式
+
+---
+
+**文档版本**: v1.1
+**最后更新**: 2024-12-26
+**重构状态**: ✅ MVP1 核心重构完成

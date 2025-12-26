@@ -14,6 +14,9 @@
 | 文档映射表 | ✅ 完成 | MAPPING-LEDGER.md 记录所有变更 |
 | 目录树结构 | ✅ 完成 | README.md 展示完整结构 |
 | Mermaid 业务流图 | ✅ 完成 | 集成至 docs/README.md |
+| **根目录重复文件清理** | ✅ 完成 | 删除 13 个旧版本重复文件 |
+| **World State 概念文档** | ✅ 完成 | 新建 LOG-CONCEPT-worldstate-v1.md |
+| **MVP1 核心节点覆盖** | ✅ 完成 | 4个节点（PO/Receipt/WorldState/Ledger）全部覆盖 100% |
 
 ---
 
@@ -91,45 +94,34 @@
 
 ### 3.1 MVP1 节点覆盖度分析
 
-| MVP1 节点 | 当前覆盖度 | 缺口文档 | 建议补全 |
-|-----------|-----------|----------|----------|
-| **采购单 (PO)** | ✅ 100% | 无 | 已覆盖 |
-| **签收 (Receipt)** | ✅ 100% | 无 | 已覆盖 |
-| **世界状态 (World State)** | ⚠️ 60% | **LOG-CONCEPT-worldstate-v1.md** | **需新建** |
-| **账本 (Ledger)** | ✅ 100% | 无 | 已覆盖 |
+| MVP1 节点 | 当前覆盖度 | 缺口文档 | 建议补全 | 状态 |
+|-----------|-----------|----------|----------|------|
+| **采购单 (PO)** | ✅ 100% | 无 | 已覆盖 | **完成** |
+| **签收 (Receipt)** | ✅ 100% | 无 | 已覆盖 | **完成** |
+| **世界状态 (World State)** | ✅ 100% | **LOG-CONCEPT-worldstate-v1.md** | ✅ 已创建 | **完成** |
+| **账本 (Ledger)** | ✅ 100% | 无 | 已覆盖 | **完成** |
 
 ---
 
-### 3.2 World State 概念文档缺失
+### 3.2 World State 概念文档缺失 ✅ 已完成
 
-**缺口描述：** 当前文档中有提及 World State 的概念（如在 LEDGER_HISTORY_QUERY.md 和诊断手册中），但缺少专门解释 World State vs Ledger 区别的文档。
+**原缺口描述：** 当前文档中有提及 World State 的概念（如在 LEDGER_HISTORY_QUERY.md 和诊断手册中），但缺少专门解释 World State vs Ledger 区别的文档。
 
-**推荐文档结构：**
+**完成状态：** ✅ 已创建 `docs/core/LOG-CONCEPT-worldstate-v1.md`
 
-```markdown
-# LOG-CONCEPT-worldstate-v1.md
+**文档内容包含：**
+- World State 定义与核心特性
+- Ledger 定义与区块链结构
+- World State vs Ledger 详细对比表
+- 数据流转机制与读写集说明
+- MVP1 实际应用场景分析
+- 代码示例（GetState vs GetHistoryForKey）
+- 常见问题解答
 
-## 1. World State 概念
-
-### 1.1 定义
-- World State 是 Fabric 的键值存储（KV Store）
-- 存储当前最新的资产状态
-- 类似传统数据库的当前数据视图
-
-### 1.2 与 Ledger 的区别
-| 特性 | World State | Ledger |
-|------|-------------|--------|
-| 数据类型 | 最新状态（Current State） | 完整历史（History） |
-| 数据结构 | Key-Value | 区块链表 |
-| 查询速度 | 快（O(1)） | 慢（需遍历） |
-| 更新频率 | 每次交易 | 只增不减 |
-
-### 1.3 核心 API
-- `PutState(key, value)` - 写入状态
-- `GetState(key)` - 读取状态
-- `GetStateByRange(startKey, endKey)` - 范围查询
-- `GetStateByPartialCompositeKey(...)` - 复合键查询
-```
+**关联文档：**
+- LOG-LEDGER-history-v1.md - 账本历史查询详解
+- LOG-CALLFLOW-e2e-v1.md - 调用链路分析
+- LOG-CORE-arch-v1.md - 系统架构概览
 
 ---
 
@@ -186,33 +178,34 @@ sequenceDiagram
 
 ## 四、推荐新增文档清单
 
-| 优先级 | 文档 | 路径 | 说明 |
-|--------|------|------|------|
-| **P0** | LOG-CONCEPT-worldstate-v1.md | docs/core/ | World State 概念说明（解决当前缺口） |
-| **P1** | LOG-SEQUENCE-mvp1-v1.md | docs/core/ | MVP1 端到端时序图 |
-| **P1** | LOG-STATEMACHINE-v1.md | docs/core/ | 状态机流转约束 |
-| **P2** | LOG-CHAINCODE-api-v1.md | docs/core/ | 完整链码 API 文档 |
-| **P2** | GDE-ARCH-diagram-v1.md | docs/guide/ | 架构图集（多视图） |
+| 优先级 | 文档 | 路径 | 说明 | 状态 |
+|--------|------|------|------|------|
+| **P0** | LOG-CONCEPT-worldstate-v1.md | docs/core/ | World State 概念说明 | ✅ 已完成 |
+| **P1** | LOG-SEQUENCE-mvp1-v1.md | docs/core/ | MVP1 端到端时序图 | ⏳ 待创建 |
+| **P1** | LOG-STATEMACHINE-v1.md | docs/core/ | 状态机流转约束 | ⏳ 待创建 |
+| **P2** | LOG-CHAINCODE-api-v1.md | docs/core/ | 完整链码 API 文档 | ⏳ 待创建 |
+| **P2** | GDE-ARCH-diagram-v1.md | docs/guide/ | 架构图集（多视图） | ⏳ 待创建 |
 
 ---
 
 ## 五、执行路线图
 
-### Phase 1: 基础设施完善（本周）
+### Phase 1: 基础设施完善 ✅ 已完成
 
 | 任务 | 负责人 | 交付物 |
 |------|--------|--------|
 | 创建 docs/ 目录结构 | ✅ 已完成 | docs/core/guide/archive/reference |
 | 迁移现有文档 | ✅ 已完成 | 21个文件重新组织 |
 | 创建 MAPPING-LEDGER.md | ✅ 已完成 | 文档映射表 |
+| 清理根目录重复文件 | ✅ 已完成 | 删除 13 个旧版本文件 |
 
-### Phase 2: 核心文档补全（1-2周）
+### Phase 2: 核心文档补全 ✅ MVP1 核心完成
 
-| 任务 | 优先级 | 交付物 | 逻辑依据 |
-|------|--------|--------|----------|
-| 编写 World State 概念文档 | P0 | LOG-CONCEPT-worldstate-v1.md | 解决 MVP1 节点覆盖缺口 |
-| 编写 MVP1 时序图 | P1 | LOG-SEQUENCE-mvp1-v1.md | 增强架构理解 |
-| 编写状态机约束文档 | P1 | LOG-STATEMACHINE-v1.md | 统一业务规则 |
+| 任务 | 优先级 | 交付物 | 逻辑依据 | 状态 |
+|------|--------|--------|----------|------|
+| 编写 World State 概念文档 | P0 | LOG-CONCEPT-worldstate-v1.md | 解决 MVP1 节点覆盖缺口 | ✅ 已完成 |
+| 编写 MVP1 时序图 | P1 | LOG-SEQUENCE-mvp1-v1.md | 增强架构理解 | ⏳ 待创建 |
+| 编写状态机约束文档 | P1 | LOG-STATEMACHINE-v1.md | 统一业务规则 | ⏳ 待创建 |
 
 ### Phase 3: 运维文档完善（持续）
 
@@ -252,6 +245,43 @@ sequenceDiagram
 
 ---
 
-**文档版本**: v1.0  
-**创建日期**: 2024-12-26  
-**下一步**: Phase 2 核心文档补全
+## 八、重构完成总结
+
+### 核心成果
+
+| 成果 | 说明 |
+|------|------|
+| **MVP1 核心节点全覆盖** | 4个节点（PO/Receipt/WorldState/Ledger）覆盖度 100% |
+| **文档结构标准化** | 24 个文档按分类码规范组织，目录深度 ≤3 层 |
+| **重复文件已清理** | 根目录 13 个旧版本重复文件已删除 |
+| **核心缺口已填补** | World State 概念文档（P0 优先级）已创建 |
+| **追溯机制完善** | MAPPING-LEDGER.md 记录所有重构决策 |
+
+### 文档统计
+
+| 目录 | 文档数 | 占比 |
+|------|--------|------|
+| docs/core/ | 7 | 29% |
+| docs/guide/ | 6 | 25% |
+| docs/ops/ | 4 | 17% |
+| docs/archive/ | 3 | 13% |
+| docs/reference/ | 1 | 4% |
+| docs/ (根) | 3 | 13% |
+| **总计** | **24** | **100%** |
+
+### 后续优化方向
+
+| 优先级 | 任务 | 预期收益 |
+|--------|------|---------|
+| P1 | 创建 MVP1 端到端时序图 | 增强跨组织调用流程理解 |
+| P1 | 编写状态机约束文档 | 统一业务规则，降低开发复杂度 |
+| P2 | 完整链码 API 文档 | 提升二次开发效率 |
+| P2 | 多视图架构图 | 便于不同角色理解系统 |
+
+---
+
+**文档版本**: v1.1 (最终版)
+**创建日期**: 2024-12-26
+**最后更新**: 2024-12-26
+**重构状态**: ✅ MVP1 核心重构完成
+**下一步**: Phase 2 持续优化（P1/P2 文档补全）

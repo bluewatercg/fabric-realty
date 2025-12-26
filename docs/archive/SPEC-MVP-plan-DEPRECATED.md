@@ -1,6 +1,14 @@
 # MVP 二开规划：数字运单管理系统
 
-本项目将基于现有的房地产交易系统进行二次开发，实现 **MVP1（核心企业签发数字运单）** 和 **MVP2（承运方确认运单）** 功能。我们将复用现有的三组织（Org1, Org2, Org3）架构，并将其业务逻辑从“房产交易”转向“物流/供应链运单流转”。
+> ⚠️ **此文档已归档，仅供参考**
+>
+> **废弃原因**：本计划描述的 RealEstate→SupplyChain 转型已完成，业务逻辑已从房产交易迭代为汽配供应链系统。
+>
+> **当前状态**：请参考 `docs/core/LOG-CORE-arch-v1.md` 了解当前汽配供应链系统架构。
+
+---
+
+本项目将基于现有的房地产交易系统进行二次开发，实现 **MVP1（核心企业签发数字运单）** 和 **MVP2（承运方确认运单）** 功能。我们将复用现有的三组织（Org1, Org2, Org3）架构，并将其业务逻辑从"房产交易"转向"物流/供应链运单流转"。
 
 ## 业务角色映射
 
@@ -13,68 +21,131 @@
 
 ### 1. 智能合约层 (Chaincode)
 
-#### 数据结构 (DigitalBill)
-- `BillOfLadingID`: 运单唯一标识（主键）
-- `Sender`: 发货方（核心企业）
-- `CarrierID`: 承运方标识
-- `Receiver`: 收货方信息
-- `CargoDetails`: 货物详情（名称、重量、货物价值 hash/佐证等）
-- `Status`: 状态：
-    - `PENDING`: 待承运方确认
-    - `ACTIVE`: 已生效/可流转
-- `Hash`: 存证哈希，由平台方签名背书
+#### 1.1 数据模型重构
+原方案采用 `RealEstate` 资产类型，新方案将替换为 `Waybill`（运单）资产。
 
-#### 核心逻辑
-- `CreateWaybill`: 仅限 Org1 调用。
-    - 输入：货物详情、承运方ID、收货人信息。
-    - 逻辑：生成 ID，设置状态为 `PENDING`，上链。
-- `ConfirmWaybill`: 仅限 Org2 调用。
-    - 输入：`BillOfLadingID`。
-    - 逻辑：验证 `CarrierID` 与调用者身份一致，将状态改为 `ACTIVE`。
-- `QueryWaybill`: 通用查询逻辑。
+**运单模型结构：**
+```go
+type Waybill struct {
+    ID           string        `json:"id"`           // 运单号
+    Sender       string        `json:"sender"`       // 发货方（核心企业）
+    CarrierID    string        `json:"carrierId"`    // 承运方ID
+    CargoDetails string        `json:"cargoDetails"` // 货物详情
+    Status       WaybillStatus `json:"status"`       // 当前状态
+    CreateTime   time.Time     `json:"createTime"`   // 创建时间
+    UpdateTime   time.Time     `json:"updateTime"`   // 更新时间
+}
 
-### 2. 后端应用层 (Server)
+type WaybillStatus string
 
-#### 接口扩展
-- 新增 `api/waybill.go`：
-    - `POST /api/core-enterprise/waybill/create`: 核心企业发起。
-    - `POST /api/carrier/waybill/confirm`: 承运方确认。
-- 新增 `service/waybill_service.go`: 封装 Fabric SDK 调用逻辑。
+const (
+    PENDING  WaybillStatus = "PENDING"  // 待承运方确认
+    ACTIVE   WaybillStatus = "ACTIVE"   // 已确认，运输中
+    FINISHED WaybillStatus = "FINISHED" // 已送达/完成
+)
+```
 
-### 3. 前端应用层 (Web)
+#### 1.2 合约方法设计
+- `CreateWaybill` - 核心企业签发运单（仅 Org1MSP 可调用）
+- `ConfirmWaybill` - 承运方确认运单（仅 Org2MSP 可调用）
+- `QueryWaybill` - 查询单个运单（所有组织可调用）
+- `QueryWaybillList` - 分页查询运单列表
 
-#### 页面组件
-- `WaybillManagement.vue`:
-    - **核心企业视角**: 录入表单（带有“申报货物价值”、“上传附件”等字段模拟），显示已签发列表。
-    - **承运方视角**: 显示待确认列表，点击“确认”触发上链操作。
+### 2. 后端服务层 (Application Server)
+
+#### 2.1 组织映射调整
+```go
+// 原配置
+ORG1 = "RealEstate Agency"
+ORG2 = "Bank"
+ORG3 = "Trading Platform"
+
+// 新配置
+ORG1 = "Core Enterprise (OEM)"
+ORG2 = "Carrier"
+ORG3 = "Logistics Platform"
+```
+
+#### 2.2 API 路由调整
+```go
+// 原路由
+/api/agency/property/create
+/api/bank/loan/approve
+/api/platform/query/all
+
+// 新路由
+/api/oem/waybill/create      # OEM 签发运单
+/api/carrier/waybill/confirm  # Carrier 确认运单
+/api/platform/query/all       # Platform 查询全部
+```
+
+### 3. 前端界面调整
+
+#### 3.1 页面角色映射
+| 原页面 | 新页面 | 角色映射 |
+|--------|--------|---------|
+| Agency.vue | OEM.vue | Org1 (核心企业) |
+| Bank.vue | Carrier.vue | Org2 (承运方) |
+| Platform.vue | Platform.vue | Org3 (监管平台) |
+
+#### 3.2 UI 字段调整
+- "房产编号" → "运单号"
+- "房产位置" → "货物详情"
+- "抵押状态" → "运输状态"
+
+## 实施步骤
+
+### Phase 1: 智能合约改造
+1. [ ] 修改 `chaincode/chaincode.go`，替换 `RealEstate` 为 `Waybill`
+2. [ ] 调整状态常量和数据结构
+3. [ ] 修改合约方法逻辑和权限检查
+4. [ ] 重新部署链码到测试网络
+
+### Phase 2: 后端服务改造
+1. [ ] 修改 `application/server/config/` 中的组织配置
+2. [ ] 更新 `service/` 层的业务逻辑
+3. [ ] 调整 API 路由和请求/响应数据模型
+4. [ ] 更新 Fabric Gateway 连接配置
+
+### Phase 3: 前端界面改造
+1. [ ] 重命名并调整 `application/web/src/views/` 下的页面文件
+2. [ ] 修改类型定义 `application/web/src/types/index.ts`
+3. [ ] 更新表单和展示组件
+4. [ ] 调整 API 调用参数和响应处理
+
+### Phase 4: 联调与测试
+1. [ ] 完成端到端流程测试（签发 → 确认 → 查询）
+2. [ ] 验证跨组织调用权限
+3. [ ] 测试历史记录查询功能
+4. [ ] 性能测试（分页查询、并发调用）
+
+## 风险与注意事项
+
+### 风险评估
+| 风险项 | 影响等级 | 缓解措施 |
+|--------|---------|---------|
+| 智能合约逻辑错误导致数据不一致 | 高 | 充分单元测试 + TestNetwork 验证 |
+| 跨组织权限配置错误 | 中 | 严格检查 MSPID 和通道权限 |
+| 前后端数据模型不一致 | 中 | 联调前对齐类型定义 |
+| 旧数据无法迁移 | 低 | 本方案为全新业务逻辑，无需迁移 |
+
+### 注意事项
+1. **MSPID 不可变**：Fabric 网络的 MSPID (`Org1MSP`, `Org2MSP`, `Org3MSP`) 保持不变，仅调整其业务角色映射。
+2. **通道配置无需修改**：当前通道 `mychannel` 可直接复用，无需重新创建通道。
+3. **链码版本管理**：建议新链码使用新版本号（如 `waybill-v1.0`），避免与旧链码冲突。
+
+## 预期交付物
+
+| 交付物 | 说明 |
+|--------|------|
+| 更新后的链码 | `chaincode/chaincode.go` |
+| 更新后的后端服务 | `application/server/` |
+| 更新后的前端应用 | `application/web/` |
+| 系统使用文档 | `docs/GUIDE.md` |
+| 部署运维手册 | `docs/DEPLOYMENT.md` |
 
 ---
 
-## 具体修改路径
-
-### [Component] Chaincode
-#### [MODIFY] [chaincode.go](file:///d:/Project/Aventura/fabric/fabric-realty/chaincode/chaincode.go)
-- 引入新的数据结构 `Waybill`。
-- 替换现有的 `RealEstate` 相关逻辑。
-
-### [Component] Server
-#### [NEW] [waybill.go](file:///d:/Project/Aventura/fabric/fabric-realty/application/server/api/waybill.go)
-#### [NEW] [waybill_service.go](file:///d:/Project/Aventura/fabric/fabric-realty/application/server/service/waybill_service.go)
-
-### [Component] Web
-#### [NEW] [WaybillManagement.vue](file:///d:/Project/Aventura/fabric/fabric-realty/application/web/src/views/WaybillManagement.vue)
-
----
-
-## 验证计划
-
-### 自动化测试 (Scripts)
-1. **签发流程**: 执行脚本以 Org1 身份创建运单，检查账本状态。
-2. **确认流程**: 执行脚本以 Org2 身份确认运单，验证状态流转。
-3. **权限验证**: 尝试以 Org3 身份执行 `ConfirmWaybill`，预期失败。
-
-### 手动验证
-1. 启动区块链网络并安装链码。
-2. 以核心企业登录 Web 端，提交一张数字运单。
-3. 退出，以承运方身份登录，查看待办并点击确认。
-4. 验证运单状态在 Web 端实时更新为“已生效”。
+**文档状态**：DEPRECATED（已废弃）
+**创建日期**：2024-12-20
+**最后更新**：2024-12-26
