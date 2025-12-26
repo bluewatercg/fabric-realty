@@ -496,7 +496,22 @@ push_menu() {
     # 如果之前自动 stash 了，现在恢复
     [[ "$did_stash" -eq 0 ]] && auto_pop 0
 }
+# ----------------------------
+# 增强型交互日志
+# ----------------------------
+browse_log() {
+    # 使用 fzf 浏览 commit，右侧预览该 commit 的具体内容
+    local selected_commit=$(git log --oneline --graph --color=always --all | \
+        fzf --ansi --no-sort --reverse --prompt="浏览历史 (Enter 查看详情, Esc 退出): " \
+        --preview="echo {} | grep -o '[a-f0-9]\{7\}' | head -1 | xargs -I % git show --color=always %" \
+        --preview-window=right:65%)
 
+    if [[ -n "$selected_commit" ]]; then
+        local commit_hash=$(echo "$selected_commit" | grep -o '[a-f0-9]\{7\}' | head -1)
+        echo -e "${C_INFO}正在查看 Commit: ${C_SUCCESS}$commit_hash${C_RESET}"
+        git show "$commit_hash"
+    fi
+}
 # ----------------------------
 # 主菜单
 # ----------------------------
@@ -517,7 +532,7 @@ main_menu() {
             "远程分支浏览 + 拉取") pull_remote_branch ;;
             "切换本地分支") switch_branch ;;
             "查看详细状态") git status ;;
-            "查看日志 (graph)") git log --oneline --graph --decorate --all -20 ;;
+            "查看日志 (graph)") browse_log ;;
             "自动 rebase") auto_rebase ;;
             "创建 Pull Request") create_pr ;;
             "分支健康评分") echo -e "${C_INFO}当前健康评分：${C_SUCCESS}$(branch_health_score)/100${C_RESET}" ;;
