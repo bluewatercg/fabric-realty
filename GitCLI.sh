@@ -11,12 +11,12 @@
 # ----------------------------
 # 颜色定义
 # ----------------------------
-C_INFO="\033[36m"
-C_SUCCESS="\033[32m"
-C_WARN="\033[33m"
-C_ERROR="\033[31m"
-C_MENU="\033[35m"
-C_RESET="\033[0m"
+C_INFO=$'\e[36m'
+C_SUCCESS=$'\e[32m'
+C_WARN=$'\e[33m'
+C_ERROR=$'\e[31m'
+C_MENU=$'\e[35m'
+C_RESET=$'\e[0m'
 
 # ----------------------------
 # 全局变量（缓存）
@@ -154,39 +154,57 @@ check_pr_status() {
 }
 
 show_repo_status() {
-    local added modified deleted untracked
-    added=$(git status --porcelain 2>/dev/null | grep -c '^A ' || echo 0)
-    modified=$(git status --porcelain 2>/dev/null | grep -c '^ M' || echo 0)
-    deleted=$(git status --porcelain 2>/dev/null | grep -c '^ D ' || echo 0)
-    untracked=$(git status --porcelain 2>/dev/null | grep -c '^?? ' || echo 0)
+    # 1. 获取数据
+    local added=$(git status --porcelain 2>/dev/null | grep -c '^A ' | tr -d '\n' || echo 0)
+    local modified=$(git status --porcelain 2>/dev/null | grep -c '^ M' | tr -d '\n' || echo 0)
+    local deleted=$(git status --porcelain 2>/dev/null | grep -c '^ D ' | tr -d '\n' || echo 0)
+    local untracked=$(git status --porcelain 2>/dev/null | grep -c '^?? ' | tr -d '\n' || echo 0)
 
-    local ahead=0 behind=0 need_rebase="No"
+    local ahead=0 behind=0 
     if git rev-parse --verify "origin/$CURRENT_BRANCH" >/dev/null 2>&1; then
         read -r behind ahead <<<"$(git rev-list --left-right --count "origin/$CURRENT_BRANCH...$CURRENT_BRANCH" 2>/dev/null || echo "0 0")"
-        [[ $behind -gt 0 ]] && need_rebase="Yes"
-    fi
-
-    local conflict_risk="No"
-    if git status --porcelain | grep -q '^UU '; then
-        conflict_risk="Yes"
     fi
 
     local health=$(branch_health_score)
+    
+    # PR 检查
+    local pr_info="No PR"
+    local pr_color="${C_INFO}" # 默认颜色
+    if [[ -n "$REPO_PATH" ]] && command -v curl >/dev/null 2>&1; then
+         local pr_count_raw=$(curl -s $GH_HEADER "https://api.github.com/repos/$REPO_PATH/pulls?head=${REPO_PATH%%/*}:$CURRENT_BRANCH" | grep -c '"html_url"' || echo 0)
+         if [[ "$pr_count_raw" -gt 0 ]]; then
+            pr_info="${pr_count_raw} Active PRs"
+            pr_color="${C_WARN}" # 有PR时显示黄色引起注意
+         fi
+    fi
 
-    echo -e "${C_MENU}================ GitCLI 状态面板 ================${C_RESET}"
-    echo -e "${C_INFO}当前分支：${C_SUCCESS}${CURRENT_BRANCH}${C_RESET}"
-    echo -e "${C_INFO}默认分支：${C_SUCCESS}${DEFAULT_BRANCH}${C_RESET}"
-    echo -e "${C_INFO}远程状态：${C_RESET}ahead $ahead, behind $behind"
-    echo -e "${C_INFO}是否需要 rebase：${C_RESET}$need_rebase"
-    echo -e "${C_INFO}冲突风险：${C_RESET}$conflict_risk"
-    check_pr_status
-    echo -e "${C_INFO}分支健康评分：${C_SUCCESS}${health}/100${C_RESET}"
-    echo -e "${C_INFO}变更统计：${C_RESET}"
-    echo -e "  新增:     ${C_SUCCESS}${added}${C_RESET}"
-    echo -e "  修改:     ${C_WARN}${modified}${C_RESET}"
-    echo -e "  删除:     ${C_ERROR}${deleted}${C_RESET}"
-    echo -e "  未跟踪:   ${C_WARN}${untracked}${C_RESET}"
-    echo -e "${C_MENU}=================================================${C_RESET}"
+    # 处理过长的分支名 (截断显示，防止撑破表格)
+    local display_branch="${CURRENT_BRANCH}"
+    if [[ ${#display_branch} -gt 28 ]]; then
+        display_branch="${display_branch:0:25}..."
+    fi
+
+    # 2. 渲染仪表盘 (修复对齐版)
+    # 核心技巧：颜色代码 ${C_xxx} 放在 %-Ns 的外面，
+    # 这样 printf 计算长度时只看纯文本，对齐就完美了。
+    
+    echo -e "${C_MENU}┌─────────────────────────────────────────────────────────────┐${C_RESET}"
+    
+    # 第一行：分支 (宽30) | 健康 (宽24)
+    printf "${C_MENU}│${C_RESET}  🌿 ${C_SUCCESS}%-30s${C_RESET}  ❤️  ${C_SUCCESS}%-20s${C_RESET} ${C_MENU}│${C_RESET}\n" \
+        "$display_branch" "$health"
+        
+    # 第二行：远程 (宽30) | PR (宽24)
+    printf "${C_MENU}│${C_RESET}  📡 ${C_INFO}%-30s${C_RESET}  🔗 ${pr_color}%-20s${C_RESET} ${C_MENU}│${C_RESET}\n" \
+        "Ahead ${ahead} / Behind ${behind}" "$pr_info"
+        
+    echo -e "${C_MENU}├─────────────────────────────────────────────────────────────┤${C_RESET}"
+    
+    # 第三行：变更统计 (使用固定宽度确保对齐)
+    printf "${C_MENU}│${C_RESET}  📊 ${C_SUCCESS}+%-8s${C_RESET} ${C_WARN}~%-8s${C_RESET} ${C_ERROR}-%-8s${C_RESET} ${C_INFO}?%-9s${C_RESET} ${C_MENU}│${C_RESET}\n" \
+        "${added} Added" "${modified} Mod" "${deleted} Del" "${untracked} Untrack"
+        
+    echo -e "${C_MENU}└─────────────────────────────────────────────────────────────┘${C_RESET}"
 }
 
 # ----------------------------
@@ -585,47 +603,44 @@ browse_log() {
     fi
 }
 # ----------------------------
-# 主菜单 (修复显示版)
+# 主菜单 (兼容修复版)
 # ----------------------------
 main_menu() {
     while true; do
-        # 1. 移除 clear，改用 fzf 托管全屏
-        
-        # 2. 捕获状态面板的输出到变量
-        # 这里的关键是让 show_repo_status 的彩色输出保存在变量里
+        # 1. 获取状态面板内容
         local status_panel=$(show_repo_status)
 
-        # 3. 构造菜单
-        # --header="$status_panel": 把状态面板作为 fzf 的头部固定显示
-        # --ansi: 让 fzf 解析颜色代码，否则面板会显示乱码
-        # --header-first: 头部显示在最上方
+        # 2. 构造菜单 (移除了导致报错的高级 border 标签)
+        # --layout=reverse: 输入框在上面
+        # --border: 保留基础边框
+        # --margin: 保留边距
+        # --header: 使用我们的仪表盘作为头部
         
-        local choice=$(printf "拉取最新代码\n推送选项菜单\n远程分支浏览 + 拉取\n切换本地分支\n查看详细状态\n查看日志 (graph)\n自动 rebase\n创建 Pull Request\n分支健康评分\n智能文件结构迁移\n退出" | \
+        local choice=$(printf "📥 拉取最新代码 (Pull)\n🚀 推送菜单 (Push Options)\n🌐 远程分支浏览\n🌿 切换本地分支\n📊 查看详细状态\n📜 查看日志 (Graph)\n🔄 自动 Rebase\n📮 创建 Pull Request\n🚑 分支健康体检\n📂 智能文件结构迁移\n❌ 退出" | \
             fzf --ansi \
-                --prompt="选择操作 > " \
-                --header="$status_panel" \
-                --header-first \
+                --layout=reverse \
                 --border \
                 --margin=1 \
-                --padding=1 || true)
+                --prompt="✨ 选择操作 > " \
+                --header="$status_panel" \
+                --header-first || true)
 
-        # 4. 处理选择
         if [[ -z "$choice" ]]; then
-             # 用户按 Esc 退出选择时，不直接退出脚本，而是刷新
+             # 只是刷新，不退出
              : 
         else
             case "$choice" in
-                "拉取最新代码") git pull ;;
-                "推送选项菜单") push_menu ;;
-                "远程分支浏览 + 拉取") pull_remote_branch ;;
-                "切换本地分支") switch_branch ;;
-                "查看详细状态") git status ;;
-                "查看日志 (graph)") browse_log ;;
-                "自动 rebase") auto_rebase ;;
-                "创建 Pull Request") create_pr ;;
-                "分支健康评分") echo -e "${C_INFO}当前健康评分：${C_SUCCESS}$(branch_health_score)/100${C_RESET}" ;;
-                "智能文件结构迁移") smart_file_migration ;;
-                "退出") echo -e "${C_SUCCESS}再见！${C_RESET}"; exit 0 ;;
+                *"拉取"*) git pull ;;
+                *"推送菜单"*) push_menu ;;
+                *"远程"*) pull_remote_branch ;;
+                *"本地"*) switch_branch ;;
+                *"详细状态"*) git status ;;
+                *"日志"*) browse_log ;;
+                *"Rebase"*) auto_rebase ;;
+                *"Pull Request"*) create_pr ;;
+                *"健康"*) echo -e "${C_INFO}当前健康评分：${C_SUCCESS}$(branch_health_score)/100${C_RESET}" ;;
+                *"迁移"*) smart_file_migration ;;
+                *"退出"*) echo -e "${C_SUCCESS}再见！${C_RESET}"; exit 0 ;;
             esac
         fi
 
@@ -633,5 +648,4 @@ main_menu() {
         read -n 1 -s -r -p "按任意键刷新菜单..."
     done
 }
-
 main_menu
