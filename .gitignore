@@ -6,3 +6,7 @@ application/web/dist/
 build/
 chaincode/vendor
 temp_mvp1/
+.log
+.gz
+.tar*.log
+*.tar.gz
