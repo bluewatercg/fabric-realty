@@ -8,7 +8,8 @@ chaincode/vendor
 temp_mvp1/
 .log
 .gz
-.tar*.log
+.tar
+*.log
 *.tar.gz
 /*.gz
 /*.log
