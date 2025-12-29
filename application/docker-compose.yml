@@ -6,7 +6,7 @@ networks:
     external: true
 
 services:
-  # 后端
+  # 后端 - 本地构建
   fabric-realty.server:
     image: togettoyou/fabric-realty.server:latest
     container_name: fabric-realty.server
@@ -14,8 +14,13 @@ services:
       - /usr/share/zoneinfo/Asia/Shanghai:/usr/share/zoneinfo/Asia/Shanghai
       - ./../network/crypto-config:/network/crypto-config
       - ./../network/data/application:/app/data
+    ports:
+      - "8080:8080"
     networks:
       - fabric_togettoyou_network
+    environment:
+      - TZ=Asia/Shanghai
+
   # 前端
   fabric-realty.web:
     image: togettoyou/fabric-realty.web:latest

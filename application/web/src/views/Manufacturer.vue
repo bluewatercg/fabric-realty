@@ -55,10 +55,13 @@
 
     <!-- 更新状态弹窗 -->
     <a-modal
-      v-model:open="showStatusModal"
+      :visible="showStatusModal"
       title="更新生产状态"
+      :closable="true"
+      :maskClosable="false"
       @ok="handleUpdateStatus"
       @cancel="showStatusModal = false"
+      @close="showStatusModal = false"
     >
       <a-form layout="vertical">
         <a-form-item label="当前订单ID">
@@ -76,9 +79,11 @@
 
     <!-- 订单详情弹窗 -->
     <a-modal
-      v-model:open="showDetailModal"
+      :visible="showDetailModal"
       title="订单详情"
       :footer="null"
+      :closable="true"
+      @cancel="showDetailModal = false"
       width="600px"
     >
       <a-descriptions bordered v-if="selectedOrder">

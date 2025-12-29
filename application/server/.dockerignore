@@ -1,0 +1,12 @@
+﻿# 忽略本地编译的可执行文件
+*.exe
+app_server # 如果这是本地编译出的可执行文件
+
+# 忽略Go模块的vendor目录（如果您的Dockerfile在容器内执行go mod download）
+vendor/
+
+# 忽略日志文件
+*.log
+
+# 临时文件
+tmp/

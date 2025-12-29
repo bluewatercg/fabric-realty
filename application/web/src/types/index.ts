@@ -27,6 +27,13 @@ export interface Shipment {
   updateTime: string;
 }
 
+// API 统一响应结构
+export interface ApiResponse<T = any> {
+  code: number;
+  message: string;
+  data?: T;
+}
+
 // 保持与之前类似的分页结果结构
 export interface SupplyChainPageResult<T> {
   records: T[];
@@ -35,5 +42,16 @@ export interface SupplyChainPageResult<T> {
   fetchedRecordsCount: number;
 }
 
-// 保留或清理旧的 Realty 相关类型，取决于用户是否还要它们
-// 这里我们为了演示重点，先定义新的
+// 历史记录相关类型
+export interface DiffDetail {
+  old: any;
+  new: any;
+}
+
+export interface HistoryRecord {
+  txId: string;
+  timestamp: string;
+  isDelete: boolean;
+  value: any;
+  diff: Record<string, DiffDetail>;
+}

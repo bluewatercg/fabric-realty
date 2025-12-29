@@ -1,5 +1,5 @@
 import request from '../utils/request';
-import type { Order, OrderItem, SupplyChainPageResult } from '../types';
+import type { Order, OrderItem, SupplyChainPageResult, HistoryRecord } from '../types';
 
 export const supplyChainApi = {
   // 主机厂 (OEM)
@@ -38,5 +38,11 @@ export const supplyChainApi = {
   },
 
   getShipment: (id: string) =>
-    request.get<never, any>(`/carrier/shipment/${id}`)
+    request.get<never, any>(`/carrier/shipment/${id}`),
+
+  getOrderHistory: (id: string) =>
+    request.get<never, HistoryRecord[]>(`/oem/order/${id}/history`),
+
+  getShipmentHistory: (id: string) =>
+    request.get<never, HistoryRecord[]>(`/carrier/shipment/${id}/history`)
 };

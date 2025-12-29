@@ -1,0 +1,262 @@
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "records": [
+      {
+        "key": "ORDER-20240101-001",
+        "current": {
+          "id": "ORDER-20240101-001",
+          "objectType": "ORDER",
+          "oemId": "Org1MSP",
+          "manufacturerId": "Org2MSP",
+          "status": "RECEIVED",
+          "totalPrice": 15000,
+          "shipmentId": "SHIPMENT-20240104-001",
+          "items": [
+            {
+              "name": "发动机缸体",
+              "quantity": 10,
+              "price": 1200
+            },
+            {
+              "name": "曲轴组件",
+              "quantity": 5,
+              "price": 600
+            }
+          ],
+          "createTime": "2024-01-01T10:00:00Z",
+          "updateTime": "2024-01-05T16:30:00Z"
+        },
+        "history": [
+          {
+            "txId": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0",
+            "timestamp": "2024-01-01T10:00:00Z",
+            "isDelete": false,
+            "value": {
+              "id": "ORDER-20240101-001",
+              "objectType": "ORDER",
+              "oemId": "Org1MSP",
+              "manufacturerId": "Org2MSP",
+              "status": "CREATED",
+              "totalPrice": 15000,
+              "items": [
+                {
+                  "name": "发动机缸体",
+                  "quantity": 10,
+                  "price": 1200
+                },
+                {
+                  "name": "曲轴组件",
+                  "quantity": 5,
+                  "price": 600
+                }
+              ],
+              "createTime": "2024-01-01T10:00:00Z",
+              "updateTime": "2024-01-01T10:00:00Z"
+            }
+          },
+          {
+            "txId": "u1v2w3x4y5z6a7b8c9d0e1f2g3h4i5j6k7l8m9n0",
+            "timestamp": "2024-01-02T11:30:00Z",
+            "isDelete": false,
+            "value": {
+              "id": "ORDER-20240101-001",
+              "status": "ACCEPTED",
+              "updateTime": "2024-01-02T11:30:00Z"
+            }
+          },
+          {
+            "txId": "o1p2q3r4s5t6u7v8w9x0y1z2a3b4c5d6e7f8g9h0",
+            "timestamp": "2024-01-03T09:15:00Z",
+            "isDelete": false,
+            "value": {
+              "id": "ORDER-20240101-001",
+              "status": "PRODUCING",
+              "updateTime": "2024-01-03T09:15:00Z"
+            }
+          },
+          {
+            "txId": "i1j2k3l4m5n6o7p8q9r0s1t2u3v4w5x6y7z8a9b0",
+            "timestamp": "2024-01-03T18:45:00Z",
+            "isDelete": false,
+            "value": {
+              "id": "ORDER-20240101-001",
+              "status": "PRODUCED",
+              "updateTime": "2024-01-03T18:45:00Z"
+            }
+          },
+          {
+            "txId": "c1d2e3f4g5h6i7j8k9l0m1n2o3p4q5r6s7t8u9v0",
+            "timestamp": "2024-01-04T08:00:00Z",
+            "isDelete": false,
+            "value": {
+              "id": "ORDER-20240101-001",
+              "status": "READY",
+              "updateTime": "2024-01-04T08:00:00Z"
+            }
+          },
+          {
+            "txId": "w1x2y3z4a5b6c7d8e9f0g1h2i3j4k5l6m7n8o9p0",
+            "timestamp": "2024-01-04T10:30:00Z",
+            "isDelete": false,
+            "value": {
+              "id": "ORDER-20240101-001",
+              "status": "SHIPPED",
+              "shipmentId": "SHIPMENT-20240104-001",
+              "updateTime": "2024-01-04T10:30:00Z"
+            }
+          },
+          {
+            "txId": "q1r2s3t4u5v6w7x8y9z0a1b2c3d4e5f6g7h8i9j0",
+            "timestamp": "2024-01-05T16:30:00Z",
+            "isDelete": false,
+            "value": {
+              "id": "ORDER-20240101-001",
+              "status": "RECEIVED",
+              "updateTime": "2024-01-05T16:30:00Z"
+            }
+          }
+        ]
+      },
+      {
+        "key": "SHIPMENT-20240104-001",
+        "current": {
+          "id": "SHIPMENT-20240104-001",
+          "objectType": "SHIPMENT",
+          "orderId": "ORDER-20240101-001",
+          "carrierId": "Org3MSP",
+          "location": "主机厂仓库",
+          "status": "已送达",
+          "updateTime": "2024-01-05T16:00:00Z"
+        },
+        "history": [
+          {
+            "txId": "w1x2y3z4a5b6c7d8e9f0g1h2i3j4k5l6m7n8o9p0",
+            "timestamp": "2024-01-04T10:30:00Z",
+            "isDelete": false,
+            "value": {
+              "id": "SHIPMENT-20240104-001",
+              "objectType": "SHIPMENT",
+              "orderId": "ORDER-20240101-001",
+              "carrierId": "Org3MSP",
+              "location": "零部件仓库",
+              "status": "运输中",
+              "updateTime": "2024-01-04T10:30:00Z"
+            }
+          },
+          {
+            "txId": "k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0",
+            "timestamp": "2024-01-04T15:30:00Z",
+            "isDelete": false,
+            "value": {
+              "id": "SHIPMENT-20240104-001",
+              "location": "高速服务区(北京方向)",
+              "status": "运输中",
+              "updateTime": "2024-01-04T15:30:00Z"
+            }
+          },
+          {
+            "txId": "e1f2g3h4i5j6k7l8m9n0o1p2q3r4s5t6u7v8w9x0",
+            "timestamp": "2024-01-05T09:00:00Z",
+            "isDelete": false,
+            "value": {
+              "id": "SHIPMENT-20240104-001",
+              "location": "北京市配送中心",
+              "status": "运输中",
+              "updateTime": "2024-01-05T09:00:00Z"
+            }
+          },
+          {
+            "txId": "y1z2a3b4c5d6e7f8g9h0i1j2k3l4m5n6o7p8q9r0",
+            "timestamp": "2024-01-05T16:00:00Z",
+            "isDelete": false,
+            "value": {
+              "id": "SHIPMENT-20240104-001",
+              "location": "主机厂仓库",
+              "status": "已送达",
+              "updateTime": "2024-01-05T16:00:00Z"
+            }
+          }
+        ]
+      },
+      {
+        "key": "ORDER-20240102-002",
+        "current": {
+          "id": "ORDER-20240102-002",
+          "objectType": "ORDER",
+          "oemId": "Org1MSP",
+          "manufacturerId": "Org2MSP",
+          "status": "PRODUCING",
+          "totalPrice": 8500,
+          "items": [
+            {
+              "name": "变速箱齿轮",
+              "quantity": 20,
+              "price": 350
+            },
+            {
+              "name": "离合器片",
+              "quantity": 15,
+              "price": 100
+            }
+          ],
+          "createTime": "2024-01-02T14:00:00Z",
+          "updateTime": "2024-01-04T10:30:00Z"
+        },
+        "history": [
+          {
+            "txId": "s1t2u3v4w5x6y7z8a9b0c1d2e3f4g5h6i7j8k9l0",
+            "timestamp": "2024-01-02T14:00:00Z",
+            "isDelete": false,
+            "value": {
+              "id": "ORDER-20240102-002",
+              "objectType": "ORDER",
+              "oemId": "Org1MSP",
+              "manufacturerId": "Org2MSP",
+              "status": "CREATED",
+              "totalPrice": 8500,
+              "items": [
+                {
+                  "name": "变速箱齿轮",
+                  "quantity": 20,
+                  "price": 350
+                },
+                {
+                  "name": "离合器片",
+                  "quantity": 15,
+                  "price": 100
+                }
+              ],
+              "createTime": "2024-01-02T14:00:00Z",
+              "updateTime": "2024-01-02T14:00:00Z"
+            }
+          },
+          {
+            "txId": "m1n2o3p4q5r6s7t8u9v0w1x2y3z4a5b6c7d8e9f0",
+            "timestamp": "2024-01-03T08:30:00Z",
+            "isDelete": false,
+            "value": {
+              "id": "ORDER-20240102-002",
+              "status": "ACCEPTED",
+              "updateTime": "2024-01-03T08:30:00Z"
+            }
+          },
+          {
+            "txId": "g1h2i3j4k5l6m7n8o9p0q1r2s3t4u5v6w7x8y9z0",
+            "timestamp": "2024-01-04T10:30:00Z",
+            "isDelete": false,
+            "value": {
+              "id": "ORDER-20240102-002",
+              "status": "PRODUCING",
+              "updateTime": "2024-01-04T10:30:00Z"
+            }
+          }
+        ]
+      }
+    ],
+    "recordsCount": 3,
+    "bookmark": "g1AAAAGzeJzLYWBg4MhgTmHgS04sKU7NS8tnMgExkhLzc1IhzFQgS1IsKZnJwJqUkpzKZGCfWJJfBJQC6i_JSy0pTuXLTEvMKU7lBGrmSC0pyfBMS0xPzEtMB6pPzE3KS01h4spMygeyUhkdgAo5GBghzAmMDiB1IkBxcyCxAMOzI5Q",
+    "fetchedRecordsCount": 3
+  }
+}
