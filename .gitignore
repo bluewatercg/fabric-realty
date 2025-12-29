@@ -10,3 +10,4 @@ temp_mvp1/
 .gz
 .tar*.log
 *.tar.gz
+/*.gz
