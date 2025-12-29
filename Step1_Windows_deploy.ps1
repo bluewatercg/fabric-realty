@@ -151,10 +151,18 @@ Log-Success "上传完成"
 
 
 # === Step 8: 远程执行 Linux 部署脚本（手动输入密码） ===
-Log-Info "Step 8: 远程执行 Linux 部署脚本"
+# === Step 8: 远程解压并执行部署脚本 ===
+Log-Info "Step 8: 远程解压并执行部署脚本"
+
+# 逻辑说明：
+# 1. cd 到目录
+# 2. tar 命令仅单独解压出 Step2_Linux_deploy.sh 这个文件
+# 3. 给脚本加执行权限
+# 4. 执行脚本
+$RemoteCommand = "cd ${REMOTE_PATH} && tar -zxvf deploy_package.tar.gz Step2_Linux_deploy.sh && chmod +x Step2_Linux_deploy.sh && ./Step2_Linux_deploy.sh"
 
 Run-Command `
-    "ssh -o 'StrictHostKeyChecking no' -o 'UserKnownHostsFile /dev/null' ${REMOTE_USER}@${REMOTE_IP} 'bash ${REMOTE_PATH}/Step2_Linux_deploy.sh'" `
+    "ssh -o 'StrictHostKeyChecking no' -o 'UserKnownHostsFile /dev/null' ${REMOTE_USER}@${REMOTE_IP} '$RemoteCommand'" `
     "远程执行部署脚本失败！"
 
 Log-Success "远程部署执行完成"

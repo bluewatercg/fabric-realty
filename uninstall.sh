@@ -31,12 +31,27 @@ echo -e "\n${RED}================================${NC}"
 echo -e "${RED}   Fabric-Realty 一键卸载脚本${NC}"
 echo -e "${RED}================================${NC}\n"
 
-# 确认卸载
-read -p "$(echo -e ${YELLOW}"警告：此操作将清除所有相关的容器、网络和数据。确定要继续吗？[y/N] "${NC})" confirm
-if [[ $confirm != [yY] ]]; then
-    log_info "操作已取消"
-    exit 0
+# ====================================================================
+# [核心修改] 处理 -y 或 --assume-yes 参数
+# ====================================================================
+ASSUME_YES=false
+if [[ "$1" == "-y" || "$1" == "--assume-yes" ]]; then
+    ASSUME_YES=true
+    log_info "检测到非交互模式 (-y)，将自动确认所有提示。"
 fi
+
+
+# 确认卸载
+if [ "$ASSUME_YES" = false ]; then # 只有在非非交互模式下才进行提示
+    read -p "$(echo -e ${YELLOW}"警告：此操作将清除所有相关的容器、网络和数据。确定要继续吗？[y/N] "${NC})" confirm
+    if [[ $confirm != [yY] ]]; then
+        log_info "操作已取消"
+        exit 0
+    fi
+else
+    log_info "自动确认卸载操作..."
+fi
+
 
 # 停止并删除应用服务容器
 log_info "清理应用服务..."
@@ -59,6 +74,7 @@ if [ -d "network" ]; then
     fi
 
     log_info "执行 network/uninstall.sh..."
+    # [重要] 这里调用的 network/uninstall.sh 脚本内部没有交互式提示，所以无需传递 -y
     ./uninstall.sh
     if [ $? -ne 0 ]; then
         log_error "区块链网络清理失败！"

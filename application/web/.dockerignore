@@ -1,0 +1,13 @@
+﻿# 忽略Node.js依赖目录和构建产物
+node_modules
+dist
+
+# 忽略本地环境变量文件
+.env
+.env.*
+
+# 忽略日志文件
+*.log
+
+# 临时文件
+tmp/

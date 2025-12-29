@@ -651,13 +651,49 @@ browse_log() {
 }
 
 # ----------------------------
+# 单文件变更时光机 (新功能)
+# ----------------------------
+file_history_explorer() {
+    echo -e "${C_INFO}🔍 正在读取文件列表...${C_RESET}"
+    
+    # 1. 选择要审计的文件
+    # 使用 git ls-files 列出所有受控文件
+    local selected_file=$(git ls-files | \
+        fzf --prompt="📄 选择要查看变更的文件 > " \
+            --preview="if command -v bat >/dev/null; then bat --color=always --style=numbers {}; else cat {}; fi" \
+            --preview-window=right:50% \
+            --height=80% --layout=reverse --border)
+
+    if [[ -z "$selected_file" ]]; then
+        echo -e "${C_WARN}未选择文件，已取消${C_RESET}"
+        return
+    fi
+
+    echo -e "${C_INFO}⏳ 正在分析 $selected_file 的历史记录...${C_RESET}"
+
+    # 2. 查看该文件的提交历史
+    # --follow: 即使文件改名也能追踪
+    # git show {1} -- "$selected_file": 只显示该文件在那次提交中的具体代码变更
+    git log --oneline --color=always --follow -- "$selected_file" | \
+        fzf --ansi \
+            --layout=reverse \
+            --border \
+            --prompt="📅 $selected_file 的变更记录 > " \
+            --header="↑/↓: 浏览变更 | Enter: 详情模式(Less) | Esc: 退出" \
+            --preview="git show --color=always {1} -- \"$selected_file\"" \
+            --preview-window=right:65% \
+            --bind "enter:execute(git show --color=always {1} -- \"$selected_file\" | less -R)"
+}
+
+# ----------------------------
 # 主菜单
 # ----------------------------
 main_menu() {
     while true; do
         local status_panel="$(show_repo_status | tr -d '\n')"
 
-        local choice=$(printf "📥 拉取最新代码 (Pull)\n🚀 推送菜单 (Push Options)\n🍒 定向文件同步 (Pick Files)\n🌐 远程分支浏览\n🌿 切换本地分支\n📊 查看详细状态\n📜 查看日志 (Graph)\n🔄 自动 Rebase\n📮 创建 Pull Request\n🚑 分支健康体检\n📂 智能文件结构迁移\n❌ 退出" | \
+        # 修改了这里：加入了 "🔍 单文件变更审计"
+        local choice=$(printf "📥 拉取最新代码 (Pull)\n🚀 推送菜单 (Push Options)\n🔍 单文件变更审计 (File History)\n🍒 定向文件同步 (Pick Files)\n🌐 远程分支浏览\n🌿 切换本地分支\n📊 查看详细状态\n📜 查看日志 (Graph)\n🔄 自动 Rebase\n📮 创建 Pull Request\n🚑 分支健康体检\n📂 智能文件结构迁移\n❌ 退出" | \
             fzf --ansi \
                 --layout=reverse \
                 --border \
@@ -672,6 +708,7 @@ main_menu() {
             case "$choice" in
                 *"拉取"*) git pull ;;
                 *"推送菜单"*) push_menu ;;
+                *"单文件变更"*) file_history_explorer ;;  # <--- 新增这一行
                 *"定向文件同步"*) sync_specific_files ;;
                 *"远程"*) pull_remote_branch ;;
                 *"本地"*) switch_branch ;;

@@ -43,21 +43,35 @@ echo -e "\n${GREEN}================================${NC}"
 echo -e "${GREEN}   Fabric-Realty 一键安装脚本${NC}"
 echo -e "${GREEN}================================${NC}\n"
 
+# ====================================================================
+# [核心修改] 处理 --assume-no-accelerator 参数
+# ====================================================================
+ASSUME_NO_ACCELERATOR=false
+if [[ "$1" == "--assume-no-accelerator" ]]; then
+    ASSUME_NO_ACCELERATOR=true
+    log_info "检测到非交互模式 (--assume-no-accelerator)，将自动选择不使用镜像加速。"
+fi
+
+
 # 镜像加速说明
 echo -e "${BLUE}镜像加速说明：${NC}"
 echo -e "1. 本项目依赖的 Docker 镜像默认从 Docker Hub 下载"
 echo -e "2. 若下载速度较慢，可选择使用镜像加速功能"
 echo -e "3. 镜像加速采用 ${YELLOW}https://github.com/togettoyou/hub-mirror${NC} 项目提供的阿里云镜像服务\n"
 
-read -p "$(echo -e ${YELLOW}"是否使用镜像加速下载？若 Docker Hub 下载较慢可选择使用 [y/N] "${NC})" use_mirror
+# 只有在非非交互模式下才进行提示
+if [ "$ASSUME_NO_ACCELERATOR" = false ]; then
+    read -p "$(echo -e ${YELLOW}"是否使用镜像加速下载？若 Docker Hub 下载较慢可选择使用 [y/N] "${NC})" use_mirror
+else
+    use_mirror="N" # 自动回答 'N' 
+    log_info "自动选择不使用镜像加速下载..."
+fi
+
 if [[ $use_mirror == [yY] ]]; then
     log_info "将使用镜像加速下载..."
-
-    # 拉取并重命名镜像
-    # docker pull registry.cn-hangzhou.aliyuncs.com/hubmirrorbytogettoyou/togettoyou.fabric-realty.server:latest && docker tag registry.cn-hangzhou.aliyuncs.com/hubmirrorbytogettoyou/togettoyou.fabric-realty.server:latest togettoyou/fabric-realty.server:latest
+    # ... (保持原始的镜像拉取和重命名逻辑)
     docker pull registry.cn-hangzhou.aliyuncs.com/hubmirrorbytogettoyou/hyperledger.fabric-orderer:2.5.10 && docker tag registry.cn-hangzhou.aliyuncs.com/hubmirrorbytogettoyou/hyperledger.fabric-orderer:2.5.10 hyperledger/fabric-orderer:2.5.10
     docker pull registry.cn-hangzhou.aliyuncs.com/hubmirrorbytogettoyou/hyperledger.fabric-baseos:2.5 && docker tag registry.cn-hangzhou.aliyuncs.com/hubmirrorbytogettoyou/hyperledger.fabric-baseos:2.5 hyperledger/fabric-baseos:2.5
-    # docker pull registry.cn-hangzhou.aliyuncs.com/hubmirrorbytogettoyou/togettoyou.fabric-realty.web:latest && docker tag registry.cn-hangzhou.aliyuncs.com/hubmirrorbytogettoyou/togettoyou.fabric-realty.web:latest togettoyou/fabric-realty.web:latest
     docker pull registry.cn-hangzhou.aliyuncs.com/hubmirrorbytogettoyou/hyperledger.fabric-tools:2.5.10 && docker tag registry.cn-hangzhou.aliyuncs.com/hubmirrorbytogettoyou/hyperledger.fabric-tools:2.5.10 hyperledger/fabric-tools:2.5.10
     docker pull registry.cn-hangzhou.aliyuncs.com/hubmirrorbytogettoyou/hyperledger.fabric-ccenv:2.5 && docker tag registry.cn-hangzhou.aliyuncs.com/hubmirrorbytogettoyou/hyperledger.fabric-ccenv:2.5 hyperledger/fabric-ccenv:2.5
     docker pull registry.cn-hangzhou.aliyuncs.com/hubmirrorbytogettoyou/hyperledger.fabric-peer:2.5.10 && docker tag registry.cn-hangzhou.aliyuncs.com/hubmirrorbytogettoyou/hyperledger.fabric-peer:2.5.10 hyperledger/fabric-peer:2.5.10
@@ -74,6 +88,7 @@ if [ ! -f "./install.sh" ]; then
 fi
 
 log_info "执行 network/install.sh..."
+# [重要] network/install.sh 内部没有交互式提示，所以无需传递参数
 ./install.sh
 if [ $? -ne 0 ]; then
     log_error "区块链网络部署失败！"
