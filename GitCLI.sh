@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
 # ============================
-# GitCLI.sh - fzf 专业版 v2.1
+# GitCLI.sh - fzf 专业版 v2.3
 # 作者: 你 + Grok 优化
-# 更新：集成定向文件同步向导
-# 日期: 2025-12-26
+# 更新：统一了“本地提交后询问推送”的逻辑
+# 日期: 2025-12-29
 # ============================
 
 #set -euo pipefail
@@ -97,6 +97,24 @@ detect_conflicts() {
     return 1
 }
 
+# 新增：通用的推送确认函数
+confirm_and_push() {
+    echo ""
+    echo -e "${C_WARN}本地提交已完成。是否推送到远程 (origin/$CURRENT_BRANCH)？(Y/n)${C_RESET}"
+    read -r push_ans
+    
+    if [[ -z "$push_ans" || "$push_ans" == "y" || "$push_ans" == "Y" ]]; then
+        echo -e "${C_INFO}🚀 正在推送...${C_RESET}"
+        if git push; then
+            echo -e "${C_SUCCESS}✅ 推送完成！${C_RESET}"
+        else
+            echo -e "${C_ERROR}❌ 推送失败（可能是网络问题或需要拉取最新代码）${C_RESET}"
+        fi
+    else
+        echo -e "${C_INFO}👌 已跳过推送，变更仅保留在本地。${C_RESET}"
+    fi
+}
+
 # ----------------------------
 # 仓库状态与分支健康
 # ----------------------------
@@ -108,19 +126,16 @@ branch_health_score() {
         read -r behind ahead <<<"$(git rev-list --left-right --count "origin/$CURRENT_BRANCH...$CURRENT_BRANCH" 2>/dev/null || echo "0 0")"
     fi
 
-    # Behind 惩罚
     if (( behind > 0 )); then
         (( score -= 40 ))
         (( score < 60 )) && score=60
     fi
 
-    # Ahead 惩罚
     if (( ahead > 15 )); then
         (( score -= (ahead - 15) * 2 ))
         (( score < 80 )) && score=80
     fi
 
-    # 冲突惩罚
     if git status --porcelain | grep -q '^UU '; then
         (( score -= 30 ))
     fi
@@ -152,7 +167,6 @@ check_pr_status() {
 }
 
 show_repo_status() {
-    # 数据采集
     local added=$(git status --porcelain | grep -c '^A ' || echo 0)
     local modified=$(git status --porcelain | awk '$1 ~ /^(M|MM|AM)/ {count++} END {print count+0}' || echo 0)
     local deleted=$(git status --porcelain | grep -c '^D ' || echo 0)
@@ -165,12 +179,10 @@ show_repo_status() {
 
     local health=$(branch_health_score)
 
-    # 健康分颜色
     local health_color="${C_SUCCESS}"
     (( health < 70 )) && health_color="${C_ERROR}"
     (( health >= 70 && health < 90 )) && health_color="${C_WARN}"
 
-    # 同步状态
     local sync_icon="✓"
     local sync_color="${C_SUCCESS}"
     if (( behind > 0 )); then
@@ -181,7 +193,6 @@ show_repo_status() {
         sync_color="${C_WARN}"
     fi
 
-    # PR 状态
     local pr_tag=""
     local pr_display=""
     if [[ -n "$REPO_PATH" ]] && command -v curl >/dev/null 2>&1 && [[ -n "${GITHUB_TOKEN:-}" ]]; then
@@ -195,12 +206,10 @@ show_repo_status() {
         (( pr_count > 0 )) && pr_tag=" ➜ $pr_count" && pr_display="${C_WARN}${pr_tag}${C_RESET}"
     fi
 
-    # 变更统计
     local changes
     printf -v changes "  ${C_SUCCESS}A %02d${C_RESET} ${C_WARN}M %02d${C_RESET} ${C_ERROR}D %02d${C_RESET} ${C_INFO}U %02d${C_RESET}" \
         "$added" "$modified" "$deleted" "$untracked"
 
-    # 最终单行输出
     printf "%b %s${C_RESET} %b%s${C_RESET} %b♥ %d${C_RESET}%s%s\n" \
         "${C_SUCCESS}" "${CURRENT_BRANCH}" \
         "${sync_color}" "${sync_icon}" \
@@ -330,7 +339,7 @@ smart_commit() {
             if [[ "$confirm" == "e" || "$confirm" == "E" ]]; then
                 commit_msg="$ai_result"
                 git commit -e -m "$commit_msg"
-                return 
+                # 编辑模式下，commit 成功后也要询问推送，所以这里不return，往下走
             elif [[ "$confirm" == "n" || "$confirm" == "N" ]]; then
                 echo -e "${C_WARN}已取消提交${C_RESET}"
                 git reset 
@@ -350,18 +359,27 @@ smart_commit() {
         return
     fi
 
+    # 执行提交
     if [[ -n "$commit_msg" ]]; then
-        git commit -m "$commit_msg"
+        # 如果刚才已经是 git commit -e 执行过了，这里就要判断一下是否还需要 commit
+        # 简单起见，如果上面 msg_source 走了编辑逻辑，git commit 已经执行，
+        # 我们只在 手动输入 或者 AI 确认采用 的时候执行这里的 commit
+        
+        # 优化逻辑：检查是否已经提交成功 (通过比较 HEAD 变化有点复杂，简单做)
+        # 实际上上面的 git commit -e 执行完，这个函数就可以接询问了。
+        
+        # 为防止重复提交，我们调整一下上面的逻辑结构：
+        # 如果是编辑模式，已经commit了。
+        # 如果是手动输入或AI直接采用，这里执行commit。
+        
+        if [[ "$confirm" != "e" && "$confirm" != "E" ]]; then
+             git commit -m "$commit_msg"
+        fi
+        
         echo -e "${C_SUCCESS}🎉 提交成功！${C_RESET}"
         
-        echo -e "${C_WARN}是否立即推送到远程？(Y/n)${C_RESET}"
-        read -r push_ans
-        
-        if [[ -z "$push_ans" || "$push_ans" == "y" || "$push_ans" == "Y" ]]; then
-            git push && echo -e "${C_SUCCESS}🚀 推送完成！${C_RESET}"
-        else
-            echo -e "${C_INFO}已跳过推送${C_RESET}"
-        fi
+        # 调用统一的推送确认
+        confirm_and_push
     fi
 }
 
@@ -452,24 +470,22 @@ smart_file_migration() {
     git status --short
 
     echo ""
-    echo -e "${C_WARN}是否执行迁移提交并推送？(y/n)${C_RESET}"
+    echo -e "${C_WARN}是否执行迁移提交？(y/n)${C_RESET}"
     read -r ans
     [[ "$ans" != "y" && "$ans" != "Y" ]] && return
 
     git add -A
     git commit -m "$commit_msg"
-    git push
-
-    echo -e "${C_SUCCESS}🎉 文件结构迁移提交完成！${C_RESET}"
+    
+    # 以前是直接 push，现在改为询问
+    confirm_and_push
 }
 
 # ----------------------------
-# 定向文件同步向导 (新功能)
+# 定向文件同步向导
 # ----------------------------
 sync_specific_files() {
-    # 1. 选择来源分支
     echo -e "${C_INFO}🔍 步骤 1/3: 选择代码来源分支...${C_RESET}"
-    
     local source_branch=$(git branch -a --format='%(refname:short)' | \
         grep -v "origin/HEAD" | \
         grep -v "^$CURRENT_BRANCH$" | \
@@ -477,47 +493,23 @@ sync_specific_files() {
         fzf --prompt="从哪个分支同步? > " \
             --preview="git log --oneline --graph --color=always {} | head -20" \
             --height=40% --layout=reverse --border)
+    if [[ -z "$source_branch" ]]; then echo -e "${C_WARN}未选择分支，已取消${C_RESET}"; return; fi
 
-    if [[ -z "$source_branch" ]]; then
-        echo -e "${C_WARN}未选择分支，已取消${C_RESET}"
-        return
-    fi
-
-    # 2. 选择目标文件
     echo -e "${C_INFO}🔍 步骤 2/3: 选择文件 (支持模糊搜索)...${C_RESET}"
-
     local diff_files=$(git diff --name-only "$CURRENT_BRANCH" "$source_branch")
-    
-    if [[ -z "$diff_files" ]]; then
-        echo -e "${C_SUCCESS}✅ 当前分支与 $source_branch 完全一致，无需同步。${C_RESET}"
-        return
-    fi
+    if [[ -z "$diff_files" ]]; then echo -e "${C_SUCCESS}✅ 当前分支与 $source_branch 完全一致，无需同步。${C_RESET}"; return; fi
 
     local selected_files=$(echo "$diff_files" | \
-        fzf -m \
-            --prompt="输入文件名模糊搜索 (Tab多选) > " \
+        fzf -m --prompt="输入文件名模糊搜索 (Tab多选) > " \
             --preview="git diff --color=always $CURRENT_BRANCH $source_branch -- {}" \
-            --preview-window=right:70% \
-            --height=80% --layout=reverse --border)
+            --preview-window=right:70% --height=80% --layout=reverse --border)
+    if [[ -z "$selected_files" ]]; then echo -e "${C_WARN}未选择文件，已取消${C_RESET}"; return; fi
 
-    if [[ -z "$selected_files" ]]; then
-        echo -e "${C_WARN}未选择文件，已取消${C_RESET}"
-        return
-    fi
-
-    # 3. 选择同步策略
     echo -e "${C_INFO}🔍 步骤 3/3: 选择同步策略...${C_RESET}"
-    
     local mode=$(printf "🔥 覆盖 (Overwrite)\n🧬 合并 (Merge)" | \
-        fzf --prompt="对选中文件执行什么操作? > " \
-            --header="覆盖 = 完全丢弃本地修改，使用对方版本\n合并 = 尝试融合代码，若有冲突需手动解决" \
-            --height=30% --layout=reverse --border)
+        fzf --prompt="对选中文件执行什么操作? > " --height=30% --layout=reverse --border)
+    if [[ -z "$mode" ]]; then return; fi
 
-    if [[ -z "$mode" ]]; then
-        return
-    fi
-
-    # 4. 执行操作
     echo ""
     local count=0
     while IFS= read -r file; do
@@ -533,9 +525,31 @@ sync_specific_files() {
             fi
         fi
     done <<< "$selected_files"
-
     echo ""
     echo -e "${C_INFO}✨ 操作完成！文件状态已更新。${C_RESET}"
+}
+
+# ----------------------------
+# 单文件变更时光机
+# ----------------------------
+file_history_explorer() {
+    echo -e "${C_INFO}🔍 正在读取文件列表...${C_RESET}"
+    local selected_file=$(git ls-files | \
+        fzf --prompt="📄 选择要查看变更的文件 > " \
+            --preview="if command -v bat >/dev/null; then bat --color=always --style=numbers {}; else cat {}; fi" \
+            --preview-window=right:50% \
+            --height=80% --layout=reverse --border)
+
+    if [[ -z "$selected_file" ]]; then echo -e "${C_WARN}未选择文件，已取消${C_RESET}"; return; fi
+
+    echo -e "${C_INFO}⏳ 正在分析 $selected_file 的历史记录...${C_RESET}"
+    git log --oneline --color=always --follow -- "$selected_file" | \
+        fzf --ansi --layout=reverse --border \
+            --prompt="📅 $selected_file 的变更记录 > " \
+            --header="↑/↓: 浏览变更 | Enter: 详情模式(Less) | Esc: 退出" \
+            --preview="git show --color=always {1} -- \"$selected_file\"" \
+            --preview-window=right:65% \
+            --bind "enter:execute(git show --color=always {1} -- \"$selected_file\" | less -R)"
 }
 
 # ----------------------------
@@ -552,17 +566,12 @@ auto_rebase() {
 create_pr() {
     [[ -z "$REPO_PATH" ]] && { echo -e "${C_ERROR}非 GitHub 仓库${C_RESET}"; return; }
     [[ -z "${GITHUB_TOKEN:-}" ]] && { echo -e "${C_ERROR}请设置 GITHUB_TOKEN 环境变量${C_RESET}"; return; }
-
     local title="feat: updates from branch $CURRENT_BRANCH"
     local body="Auto-generated PR from GitCLI tool."
-
     echo -e "${C_INFO}📮 创建 PR（base: $DEFAULT_BRANCH）...${C_RESET}"
-
-    local response=$(curl -s -X POST $GH_HEADER \
-        -H "Accept: application/vnd.github+json" \
+    local response=$(curl -s -X POST $GH_HEADER -H "Accept: application/vnd.github+json" \
         -d "{\"title\":\"$title\",\"body\":\"$body\",\"head\":\"$CURRENT_BRANCH\",\"base\":\"$DEFAULT_BRANCH\"}" \
         "https://api.github.com/repos/$REPO_PATH/pulls")
-
     if echo "$response" | grep -q '"html_url"'; then
         local pr_url=$(echo "$response" | grep '"html_url"' | head -1 | sed 's/.*"html_url": "\(.*\)".*/\1/')
         echo -e "${C_SUCCESS}🎉 PR 创建成功：$pr_url${C_RESET}"
@@ -583,14 +592,10 @@ switch_branch() {
     [[ -n "$target" ]] && git checkout "$target"
 }
 
-select_remote_branch() {
-    git fetch --quiet
-    git ls-remote --heads origin | awk '{print $2}' | sed 's@refs/heads/@@' |
-        fzf --prompt="选择远程分支: " --preview="git log --oneline --graph --decorate --color=always origin/{}" --preview-window=right:60%
-}
-
 pull_remote_branch() {
-    local branch=$(select_remote_branch)
+    git fetch --quiet
+    local branch=$(git ls-remote --heads origin | awk '{print $2}' | sed 's@refs/heads/@@' | \
+        fzf --prompt="选择远程分支: " --preview="git log --oneline --graph --decorate --color=always origin/{}" --preview-window=right:60%)
     [[ -z "$branch" ]] && return
     if git branch --list | grep -q "^$branch\$"; then
         git checkout "$branch" && git pull
@@ -607,6 +612,53 @@ push_new_branch() {
     [[ -z "$name" ]] && name="$default"
     git push origin HEAD:"$name"
     echo -e "${C_SUCCESS}已推送到远程分支：$name${C_RESET}"
+}
+
+browse_log() {
+    local selected_commit=$(git log --oneline --graph --color=always --all | \
+        fzf --ansi --no-sort --reverse --prompt="浏览历史 (Enter 查看详情, Esc 退出): " \
+        --preview="echo {} | grep -o '[a-f0-9]\{7\}' | head -1 | xargs -I % git show --color=always %" \
+        --preview-window=right:65%)
+    if [[ -n "$selected_commit" ]]; then
+        local commit_hash=$(echo "$selected_commit" | grep -o '[a-f0-9]\{7\}' | head -1)
+        echo -e "${C_INFO}正在查看 Commit: ${C_SUCCESS}$commit_hash${C_RESET}"
+        git show "$commit_hash"
+    fi
+}
+
+# ----------------------------
+# 智能强制推送 (新功能)
+# ----------------------------
+smart_force_push() {
+    local action=$(printf "👉 当前分支 ($CURRENT_BRANCH)\n🔀 选择其他分支..." | \
+        fzf --prompt="强制推送目标 > " --height=20% --layout=reverse --border)
+
+    local target_branch="$CURRENT_BRANCH"
+
+    if [[ "$action" == *"选择其他"* ]]; then
+        target_branch=$(git branch --format='%(refname:short)' | \
+            fzf --prompt="选择要强制推送的本地分支 > " \
+                --preview="git log --oneline --graph --color=always {} | head -20" \
+                --height=50% --layout=reverse --border)
+    fi
+
+    [[ -z "$target_branch" ]] && return
+
+    echo ""
+    echo -e "${C_ERROR}⚠️  高危操作警告 ⚠️${C_RESET}"
+    echo -e "你即将执行: git push ${C_ERROR}--force-with-lease${C_RESET} origin ${C_WARN}${target_branch}${C_RESET}"
+    echo -e "这将用本地代码覆盖远程，请确保没有他人在该分支提交代码。"
+    echo ""
+    echo -e "${C_WARN}请输入 YES (大写) 确认执行，其他键取消: ${C_RESET}"
+    read -r confirm
+
+    if [[ "$confirm" == "YES" ]]; then
+        echo -e "${C_INFO}🚀 正在执行强制推送...${C_RESET}"
+        git push --force-with-lease origin "$target_branch" && \
+        echo -e "${C_SUCCESS}✅ 强制推送完成！${C_RESET}"
+    else
+        echo -e "${C_INFO}⛔ 已取消操作${C_RESET}"
+    fi
 }
 
 push_menu() {
@@ -627,7 +679,7 @@ push_menu() {
 
     case "$choice" in
         "普通推送") git push ;;
-        "强制推送（--force-with-lease）") git push --force-with-lease ;;
+        "强制推送（--force-with-lease）") smart_force_push ;;
         "智能提交 + 推送") smart_commit ;;
         "推送到新分支（备份）") push_new_branch ;;
         "智能文件结构迁移并推送") smart_file_migration ;;
@@ -637,70 +689,14 @@ push_menu() {
     [[ "$did_stash" -eq 0 ]] && auto_pop 0
 }
 
-browse_log() {
-    local selected_commit=$(git log --oneline --graph --color=always --all | \
-        fzf --ansi --no-sort --reverse --prompt="浏览历史 (Enter 查看详情, Esc 退出): " \
-        --preview="echo {} | grep -o '[a-f0-9]\{7\}' | head -1 | xargs -I % git show --color=always %" \
-        --preview-window=right:65%)
-
-    if [[ -n "$selected_commit" ]]; then
-        local commit_hash=$(echo "$selected_commit" | grep -o '[a-f0-9]\{7\}' | head -1)
-        echo -e "${C_INFO}正在查看 Commit: ${C_SUCCESS}$commit_hash${C_RESET}"
-        git show "$commit_hash"
-    fi
-}
-
-# ----------------------------
-# 单文件变更时光机 (新功能)
-# ----------------------------
-file_history_explorer() {
-    echo -e "${C_INFO}🔍 正在读取文件列表...${C_RESET}"
-    
-    # 1. 选择要审计的文件
-    # 使用 git ls-files 列出所有受控文件
-    local selected_file=$(git ls-files | \
-        fzf --prompt="📄 选择要查看变更的文件 > " \
-            --preview="if command -v bat >/dev/null; then bat --color=always --style=numbers {}; else cat {}; fi" \
-            --preview-window=right:50% \
-            --height=80% --layout=reverse --border)
-
-    if [[ -z "$selected_file" ]]; then
-        echo -e "${C_WARN}未选择文件，已取消${C_RESET}"
-        return
-    fi
-
-    echo -e "${C_INFO}⏳ 正在分析 $selected_file 的历史记录...${C_RESET}"
-
-    # 2. 查看该文件的提交历史
-    # --follow: 即使文件改名也能追踪
-    # git show {1} -- "$selected_file": 只显示该文件在那次提交中的具体代码变更
-    git log --oneline --color=always --follow -- "$selected_file" | \
-        fzf --ansi \
-            --layout=reverse \
-            --border \
-            --prompt="📅 $selected_file 的变更记录 > " \
-            --header="↑/↓: 浏览变更 | Enter: 详情模式(Less) | Esc: 退出" \
-            --preview="git show --color=always {1} -- \"$selected_file\"" \
-            --preview-window=right:65% \
-            --bind "enter:execute(git show --color=always {1} -- \"$selected_file\" | less -R)"
-}
-
 # ----------------------------
 # 主菜单
 # ----------------------------
 main_menu() {
     while true; do
         local status_panel="$(show_repo_status | tr -d '\n')"
-
-        # 修改了这里：加入了 "🔍 单文件变更审计"
         local choice=$(printf "📥 拉取最新代码 (Pull)\n🚀 推送菜单 (Push Options)\n🔍 单文件变更审计 (File History)\n🍒 定向文件同步 (Pick Files)\n🌐 远程分支浏览\n🌿 切换本地分支\n📊 查看详细状态\n📜 查看日志 (Graph)\n🔄 自动 Rebase\n📮 创建 Pull Request\n🚑 分支健康体检\n📂 智能文件结构迁移\n❌ 退出" | \
-            fzf --ansi \
-                --layout=reverse \
-                --border \
-                --margin=1 \
-                --prompt="✨ 选择操作 > " \
-                --header="$status_panel" \
-                --header-first || true)
+            fzf --ansi --layout=reverse --border --margin=1 --prompt="✨ 选择操作 > " --header="$status_panel" --header-first || true)
 
         if [[ -z "$choice" ]]; then
              : 
@@ -708,7 +704,7 @@ main_menu() {
             case "$choice" in
                 *"拉取"*) git pull ;;
                 *"推送菜单"*) push_menu ;;
-                *"单文件变更"*) file_history_explorer ;;  # <--- 新增这一行
+                *"单文件变更"*) file_history_explorer ;;
                 *"定向文件同步"*) sync_specific_files ;;
                 *"远程"*) pull_remote_branch ;;
                 *"本地"*) switch_branch ;;
