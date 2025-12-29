@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 
 # ============================
 # GitCLI.sh - fzf 专业版 v2.0
@@ -97,7 +97,7 @@ detect_conflicts() {
 }
 
 # ----------------------------
-# 仓库状态与分支健康
+# 仓库状态与分支健康（Nerd Fonts 终极美化版）
 # ----------------------------
 branch_health_score() {
     local score=100
@@ -107,24 +107,21 @@ branch_health_score() {
         read -r behind ahead <<<"$(git rev-list --left-right --count "origin/$CURRENT_BRANCH...$CURRENT_BRANCH" 2>/dev/null || echo "0 0")"
     fi
 
-    [[ $behind -gt 0 ]] && score=$((score - 20))
-    [[ $ahead -gt 20 ]] && score=$((score - 10))
-    [[ $behind -gt 0 ]] && score=$((score - 20))
-
-    if git status --porcelain | grep -q '^UU '; then
-        score=$((score - 30))
+    # Behind 惩罚（最多扣40分）
+    if (( behind > 0 )); then
+        (( score -= 40 ))
+        (( score < 60 )) && score=60
     fi
 
-    # PR 状态检测（支持 jq 优先）
-    if [[ -n "$REPO_PATH" ]] && command -v curl >/dev/null 2>&1; then
-        local api_url="https://api.github.com/repos/$REPO_PATH/pulls?head=${REPO_PATH%%/*}:$CURRENT_BRANCH"
-        local pr_count=0
-        if command -v jq >/dev/null 2>&1; then
-            pr_count=$(curl -s $GH_HEADER -H "Accept: application/vnd.github+json" "$api_url" | jq 'length' 2>/dev/null || echo 0)
-        else
-            pr_count=$(curl -s $GH_HEADER "$api_url" | grep -c '"html_url"' || echo 0)
-        fi
-        [[ $pr_count -eq 0 ]] && score=$((score - 20))
+    # Ahead 过多惩罚（超过15个commit开始扣，最多扣20分）
+    if (( ahead > 15 )); then
+        (( score -= (ahead - 15) * 2 ))
+        (( score < 80 )) && score=80
+    fi
+
+    # 有冲突直接重罚
+    if git status --porcelain | grep -q '^UU '; then
+        (( score -= 30 ))
     fi
 
     (( score < 0 )) && score=0
@@ -153,59 +150,65 @@ check_pr_status() {
     fi
 }
 
-show_repo_status() {
-    # 1. 获取数据
-    local added=$(git status --porcelain 2>/dev/null | grep -c '^A ' | tr -d '\n' || echo 0)
-    local modified=$(git status --porcelain 2>/dev/null | grep -c '^ M' | tr -d '\n' || echo 0)
-    local deleted=$(git status --porcelain 2>/dev/null | grep -c '^ D ' | tr -d '\n' || echo 0)
-    local untracked=$(git status --porcelain 2>/dev/null | grep -c '^?? ' | tr -d '\n' || echo 0)
 
-    local ahead=0 behind=0 
+show_repo_status() {
+    # 数据采集
+    local added=$(git status --porcelain | grep -c '^A ' || echo 0)
+    local modified=$(git status --porcelain | awk '$1 ~ /^(M|MM|AM)/ {count++} END {print count+0}' || echo 0)
+    local deleted=$(git status --porcelain | grep -c '^D ' || echo 0)
+    local untracked=$(git status --porcelain | grep -c '^?? ' || echo 0)
+
+    local ahead=0 behind=0
     if git rev-parse --verify "origin/$CURRENT_BRANCH" >/dev/null 2>&1; then
         read -r behind ahead <<<"$(git rev-list --left-right --count "origin/$CURRENT_BRANCH...$CURRENT_BRANCH" 2>/dev/null || echo "0 0")"
     fi
 
     local health=$(branch_health_score)
-    
-    # PR 检查
-    local pr_info="No PR"
-    local pr_color="${C_INFO}" # 默认颜色
-    if [[ -n "$REPO_PATH" ]] && command -v curl >/dev/null 2>&1; then
-         local pr_count_raw=$(curl -s $GH_HEADER "https://api.github.com/repos/$REPO_PATH/pulls?head=${REPO_PATH%%/*}:$CURRENT_BRANCH" | grep -c '"html_url"' || echo 0)
-         if [[ "$pr_count_raw" -gt 0 ]]; then
-            pr_info="${pr_count_raw} Active PRs"
-            pr_color="${C_WARN}" # 有PR时显示黄色引起注意
-         fi
+
+    # 健康分颜色
+    local health_color="${C_SUCCESS}"
+    (( health < 70 )) && health_color="${C_ERROR}"
+    (( health >= 70 && health < 90 )) && health_color="${C_WARN}"
+
+    # 同步状态
+    local sync_icon="✓"
+    local sync_color="${C_SUCCESS}"
+    if (( behind > 0 )); then
+        sync_icon="↓${behind}"
+        sync_color="${C_ERROR}"
+    elif (( ahead > 0 )); then
+        sync_icon="↑${ahead}"
+        sync_color="${C_WARN}"
     fi
 
-    # 处理过长的分支名 (截断显示，防止撑破表格)
-    local display_branch="${CURRENT_BRANCH}"
-    if [[ ${#display_branch} -gt 28 ]]; then
-        display_branch="${display_branch:0:25}..."
+    # PR 状态（颜色由外层控制）
+    local pr_tag=""
+    local pr_display=""
+    if [[ -n "$REPO_PATH" ]] && command -v curl >/dev/null 2>&1 && [[ -n "${GITHUB_TOKEN:-}" ]]; then
+        local api_url="https://api.github.com/repos/$REPO_PATH/pulls?head=${REPO_PATH%%/*}:$CURRENT_BRANCH&state=open"
+        local pr_count=0
+        if command -v jq >/dev/null 2>&1; then
+            pr_count=$(curl -s $GH_HEADER -H "Accept: application/vnd.github+json" "$api_url" | jq 'length' 2>/dev/null || echo 0)
+        else
+            pr_count=$(curl -s $GH_HEADER "$api_url" | grep -c '"html_url"' || echo 0)
+        fi
+        (( pr_count > 0 )) && pr_tag=" ➜ $pr_count" && pr_display="${C_WARN}${pr_tag}${C_RESET}"
     fi
 
-    # 2. 渲染仪表盘 (修复对齐版)
-    # 核心技巧：颜色代码 ${C_xxx} 放在 %-Ns 的外面，
-    # 这样 printf 计算长度时只看纯文本，对齐就完美了。
-    
-    echo -e "${C_MENU}┌─────────────────────────────────────────────────────────────┐${C_RESET}"
-    
-    # 第一行：分支 (宽30) | 健康 (宽24)
-    printf "${C_MENU}│${C_RESET}  🌿 ${C_SUCCESS}%-30s${C_RESET}  ❤️  ${C_SUCCESS}%-20s${C_RESET} ${C_MENU}│${C_RESET}\n" \
-        "$display_branch" "$health"
-        
-    # 第二行：远程 (宽30) | PR (宽24)
-    printf "${C_MENU}│${C_RESET}  📡 ${C_INFO}%-30s${C_RESET}  🔗 ${pr_color}%-20s${C_RESET} ${C_MENU}│${C_RESET}\n" \
-        "Ahead ${ahead} / Behind ${behind}" "$pr_info"
-        
-    echo -e "${C_MENU}├─────────────────────────────────────────────────────────────┤${C_RESET}"
-    
-    # 第三行：变更统计 (使用固定宽度确保对齐)
-    printf "${C_MENU}│${C_RESET}  📊 ${C_SUCCESS}+%-8s${C_RESET} ${C_WARN}~%-8s${C_RESET} ${C_ERROR}-%-8s${C_RESET} ${C_INFO}?%-9s${C_RESET} ${C_MENU}│${C_RESET}\n" \
-        "${added} Added" "${modified} Mod" "${deleted} Del" "${untracked} Untrack"
-        
-    echo -e "${C_MENU}└─────────────────────────────────────────────────────────────┘${C_RESET}"
+    # 变更统计：固定宽度对齐（两位数补0）
+    local changes
+    printf -v changes "  ${C_SUCCESS}A %02d${C_RESET} ${C_WARN}M %02d${C_RESET} ${C_ERROR}D %02d${C_RESET} ${C_INFO}U %02d${C_RESET}" \
+        "$added" "$modified" "$deleted" "$untracked"
+
+    # 最终单行输出
+    printf "%b %s${C_RESET} %b%s${C_RESET} %b♥ %d${C_RESET}%s%s\n" \
+        "${C_SUCCESS}" "${CURRENT_BRANCH}" \
+        "${sync_color}" "${sync_icon}" \
+        "${health_color}" "${health}" \
+        "$pr_display" \
+        "$changes"
 }
+
 
 # ----------------------------
 # 自动 stash / pop
@@ -608,7 +611,7 @@ browse_log() {
 main_menu() {
     while true; do
         # 1. 获取状态面板内容
-        local status_panel=$(show_repo_status)
+        local status_panel="$(show_repo_status | tr -d '\n')"
 
         # 2. 构造菜单 (移除了导致报错的高级 border 标签)
         # --layout=reverse: 输入框在上面
