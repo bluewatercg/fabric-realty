@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 
 # ======================================================
-# GitCLI.sh - v2.7 (完美融合版)
-# 融合特性：清爽UI + 目录级浏览 + 自动Stash/Untracked修复 + DeepSeek + 定向同步
+# GitCLI.sh - v2.8 (补全版)
+# 修复：找回丢失的 "备份推送" 功能
+# 特性：清爽UI + 目录级浏览 + 自动Stash + DeepSeek + 定向同步 + 备份快照
 # ======================================================
 
 set -u
@@ -18,23 +19,20 @@ C_MENU=$'\e[35m'
 C_RESET=$'\e[0m'
 
 # ----------------------------
-# 1. 基础环境检查 (保留高健壮性)
+# 1. 基础环境检查
 # ----------------------------
 check_dependencies() {
     command -v git >/dev/null 2>&1 || { echo -e "${C_ERROR}未检测到 git${C_RESET}"; exit 1; }
     command -v fzf >/dev/null 2>&1 || { echo -e "${C_ERROR}未检测到 fzf${C_RESET}"; exit 1; }
     
-    # 检查是否在 Git 仓库
     if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
         echo -e "${C_ERROR}当前目录不是 Git 仓库${C_RESET}"; exit 1
     fi
     
-    # 检查 jq (AI 功能依赖)
     if ! command -v jq >/dev/null 2>&1; then
         echo -e "${C_WARN}未检测到 jq，AI 提交与 PR 功能将受限${C_RESET}"
     fi
     
-    # 加载 Token (如果存在)
     if [[ -n "${GITHUB_TOKEN:-}" ]]; then
         GH_HEADER="-H \"Authorization: token $GITHUB_TOKEN\""
     else
@@ -45,10 +43,9 @@ check_dependencies() {
 check_dependencies
 
 # ----------------------------
-# 2. 核心 UI 面板 (采用新版清爽风格)
+# 2. 核心 UI 面板
 # ----------------------------
 get_status_header() {
-    # 提取数据 (强制去空格防止布局错乱)
     local added=$(git status --porcelain | grep -c '^A ' | tr -d '[:space:]' || echo 0)
     local modified=$(git status --porcelain | awk '$1 ~ /^(M|MM|AM)/ {count++} END {print count+0}' | tr -d '[:space:]')
     local deleted=$(git status --porcelain | grep -c '^D ' | tr -d '[:space:]' || echo 0)
@@ -62,14 +59,11 @@ get_status_header() {
         read -r behind ahead <<<"$(git rev-list --left-right --count "origin/$branch...$branch" 2>/dev/null | tr '\n' ' ' || echo "0 0")"
     fi
 
-    # 构造 UI
     local bar=$(echo -e "${C_MENU}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C_RESET}")
     
-    # 行1：分支信息
     local line1=$(printf "${C_INFO} 🌿 分支: ${C_SUCCESS}%-15s${C_RESET} ${C_INFO}同步: ${C_WARN}↑%s ↓%s${C_RESET} ${C_INFO} 项目: ${C_SUCCESS}%s${C_RESET}" \
                  "$branch" "${ahead:-0}" "${behind:-0}" "$repo")
                  
-    # 行2：文件状态
     local line2=$(printf "${C_INFO} 📊 状态: ${C_SUCCESS}新增:%s ${C_WARN}修改:%s ${C_ERROR}删除:%s ${C_INFO}未跟踪:%s${C_RESET}" \
                  "${added:-0}" "${modified:-0}" "${deleted:-0}" "${untracked:-0}")
     
@@ -77,7 +71,7 @@ get_status_header() {
 }
 
 # ----------------------------
-# 3. 辅助工具 (自动 Stash - 包含 Untracked 修复)
+# 3. 辅助工具 (自动 Stash)
 # ----------------------------
 has_uncommitted() {
     [[ -n "$(git status --porcelain)" ]]
@@ -89,7 +83,6 @@ auto_stash() {
         echo -e "${C_INFO}是否自动暂存(stash)？(y/n)${C_RESET}"
         read -r -t 10 ans || ans="n"
         if [[ "$ans" == "y" || "$ans" == "Y" ]]; then
-            # 关键：-u 参数包含 untracked 文件
             git stash push -u -m "Auto stash by GitCLI" >/dev/null
             echo -e "${C_SUCCESS}✅ 已暂存变更。${C_RESET}"
             return 0
@@ -102,7 +95,7 @@ auto_stash() {
 }
 
 # ----------------------------
-# 4. 智能提交与 AI (集成 DeepSeek)
+# 4. 智能提交与 AI
 # ----------------------------
 generate_ai_commit() {
     if [[ -z "${DEEPSEEK_API_KEY:-}" ]]; then
@@ -125,19 +118,16 @@ generate_ai_commit() {
 }
 
 smart_commit() {
-    # 1. 恢复 Stash 检查
     if [[ -n "$(git stash list | grep 'Auto stash by GitCLI' | tail -1)" ]]; then
          echo -e "${C_WARN}检测到自动 Stash，是否恢复？(y/n)${C_RESET}"
          read -r ans; [[ "$ans" == "y" ]] && git stash pop
     fi
 
-    # 2. 选择文件
     local files=$(git status --porcelain | fzf -m --ansi --prompt="选择文件 (Tab多选) > " \
         --preview="echo {} | awk '{print \$2}' | xargs git diff --color=always")
     [[ -z "$files" ]] && return
     echo "$files" | awk '{print $2}' | xargs git add
 
-    # 3. 选择 Message 来源
     local mode=$(printf "✨ AI 生成 (DeepSeek)\n📝 手动输入\n🔙 取消" | fzf --prompt="Commit Message > ")
     local msg=""
     
@@ -145,7 +135,6 @@ smart_commit() {
         *"AI"*) 
             msg=$(generate_ai_commit)
             [[ -z "$msg" || "$msg" == "null" ]] && { echo "AI 生成失败"; return; }
-            # AI 生成后允许编辑
             read -e -p "确认或编辑消息: " -i "$msg" final_msg
             msg="$final_msg"
             ;;
@@ -153,7 +142,6 @@ smart_commit() {
         *) git reset; return ;;
     esac
 
-    # 4. 提交并询问推送 (保留你想要的安全询问)
     if [[ -n "$msg" ]]; then
         git commit -m "$msg" && echo -e "${C_SUCCESS}🎉 提交成功!${C_RESET}"
         echo -e "${C_WARN}🚀 是否立即推送到远程? (Y/n)${C_RESET}"
@@ -163,38 +151,31 @@ smart_commit() {
 }
 
 # ----------------------------
-# 5. 目录级文件审计 (融合新版逻辑 + 旧版时光机)
+# 5. 目录级文件审计
 # ----------------------------
 file_history_explorer() {
     local path="."
     while true; do
-        # 列出文件和目录，过滤掉 .git，添加 .. 选项
         local list=$(ls -F "$path" | grep -v '^\./$' | grep -v '^../$')
-        
-        # 使用 fzf 选择
         local sel=$(printf ".. (返回上一级)\n%s" "$list" | fzf --ansi --prompt="📂 浏览: $path > " \
             --header="Enter进入目录/查看历史 | 预览窗口显示内容" \
             --preview="target='${path}/{}'; target=\${target%*}; if [[ -d \$target ]]; then ls -C --color=always \$target; else if command -v bat >/dev/null; then bat --color=always --style=numbers \$target; else cat \$target; fi; fi")
             
         [[ -z "$sel" ]] && break
         
-        # 处理返回上一级
         if [[ "$sel" == ".. (返回上一级)" ]]; then 
             [[ "$path" == "." ]] && break 
             path=$(dirname "$path")
             continue
         fi
         
-        # 构建完整路径
-        local clean_sel=${sel%*} # 去除 ls -F 产生的结尾符号 (*, /, @)
+        local clean_sel=${sel%*} 
         local full="${path}/${clean_sel}"
-        full=${full#./} # 去除开头的 ./
+        full=${full#./} 
 
         if [[ -d "$full" ]]; then
-            # 如果是目录，进入
             path="$full"
         else
-            # 如果是文件，调用旧版强大的 Git 历史查看功能
             git log --oneline --color=always --follow -- "$full" | fzf --ansi \
                 --prompt="📅 $full 变更记录 > " \
                 --preview="git show --color=always {1} -- \"$full\"" \
@@ -204,10 +185,9 @@ file_history_explorer() {
 }
 
 # ----------------------------
-# 6. 高级操作 (同步/强推/迁移 - 全部保留旧版逻辑)
+# 6. 高级操作 (同步/强推/备份)
 # ----------------------------
 smart_force_push() {
-    # 保留旧版的安全检查逻辑
     local action=$(printf "👉 当前分支\n🔀 其他分支" | fzf --prompt="推送到哪里? > ")
     local target=$(git rev-parse --abbrev-ref HEAD)
     
@@ -223,10 +203,29 @@ smart_force_push() {
     [[ "$confirm" == "YES" ]] && git push --force-with-lease origin "$target" && echo -e "${C_SUCCESS}完成${C_RESET}"
 }
 
+# 【新增功能】：备份推送到新分支
+push_backup_branch() {
+    local current_branch=$(git rev-parse --abbrev-ref HEAD)
+    local timestamp=$(date '+%Y%m%d-%H%M')
+    # 默认备份分支名：backup/当前分支名/时间戳
+    local default="backup/$current_branch/$timestamp"
+    
+    echo -e "${C_INFO}创建一个远程备份分支 (不影响当前本地工作区)${C_RESET}"
+    echo -e "输入新分支名 (回车默认: ${C_SUCCESS}$default${C_RESET}):"
+    read -r name
+    [[ -z "$name" ]] && name="$default"
+    
+    echo -e "${C_INFO}⏳ 正在推送 HEAD 到 origin/$name ...${C_RESET}"
+    if git push origin HEAD:"$name"; then
+        echo -e "${C_SUCCESS}✅ 备份完成！远程分支已创建：$name${C_RESET}"
+    else
+        echo -e "${C_ERROR}❌ 备份失败${C_RESET}"
+    fi
+}
+
 switch_branch_safe() {
     local target=$(git branch --format='%(refname:short)' | fzf --prompt="切换分支 > " --preview="git log --oneline --graph --color=always {} | head -20")
     if [[ -n "$target" ]]; then
-        # 自动 Stash 保护 (含 -u 修复)
         if has_uncommitted; then
             auto_stash || return
         fi
@@ -235,7 +234,6 @@ switch_branch_safe() {
 }
 
 sync_specific_files() {
-    # 保留旧版强大的同步向导
     local br=$(git branch -a --format='%(refname:short)' | grep -v "origin/HEAD" | fzf --prompt="源分支 > ")
     [[ -z "$br" ]] && return
     
@@ -252,18 +250,15 @@ sync_specific_files() {
 }
 
 # ----------------------------
-# 7. 主菜单 Loop (融合 Source A 的 UI 和 Source B 的功能)
+# 7. 主菜单 Loop
 # ----------------------------
 main_menu() {
     while true; do
-        # 清屏 (保持 Source A 的清爽感)
         clear 
-        
-        # 1. 获取 Header
         local header_content=$(get_status_header)
         
-        # 2. 菜单选项
-        local choice=$(printf "🔄 刷新状态\n📥 拉取代码 (Pull)\n🚀 智能提交 (Smart Commit)\n📤 普通推送 (Push)\n🧨 强制推送 (Force Push)\n🌿 切换分支 (Checkout)\n🔍 文件审计 (Explorer)\n🍒 定向同步 (Sync Files)\n📜 查看日志 (Log)\n📂 结构迁移 (Migrate)\n❌ 退出" | \
+        # 将 "💾 备份推送" 加回了列表
+        local choice=$(printf "🔄 刷新状态\n📥 拉取代码 (Pull)\n🚀 智能提交 (Smart Commit)\n📤 普通推送 (Push)\n💾 备份推送 (Backup)\n🧨 强制推送 (Force Push)\n🌿 切换分支 (Checkout)\n🔍 文件审计 (Explorer)\n🍒 定向同步 (Sync Files)\n📜 查看日志 (Log)\n📂 结构迁移 (Migrate)\n❌ 退出" | \
             fzf --ansi --layout=reverse --border=rounded --margin=1 --header-first \
                 --height=100% --prompt="✨ GitCLI > " --header="$header_content")
 
@@ -274,13 +269,13 @@ main_menu() {
             *"拉取"*) git pull ;;
             *"智能提交"*) smart_commit ;;
             *"普通推送"*) git push ;;
+            *"备份推送"*) push_backup_branch ;;  # <--- 调用新加的备份函数
             *"强制推送"*) smart_force_push ;;
             *"切换分支"*) switch_branch_safe ;;
             *"文件审计"*) file_history_explorer ;;
             *"定向同步"*) sync_specific_files ;;
             *"查看日志"*) git log --oneline --graph --all --color=always | fzf --ansi --preview="echo {} | grep -o '[a-f0-9]\{7\}' | head -1 | xargs -I % git show --color=always %" ;;
             *"结构迁移"*) 
-                # 这里可以放回旧版的 smart_file_migration，或者简化版
                 git add -A && git commit -m "refactor: structural migration" && echo "本地已提交" 
                 ;;
             *"退出"*) exit 0 ;;
