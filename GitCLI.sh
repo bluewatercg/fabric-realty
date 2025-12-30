@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
 # ======================================================
-# GitCLI.sh - v2.8 (补全版)
-# 修复：找回丢失的 "备份推送" 功能
-# 特性：清爽UI + 目录级浏览 + 自动Stash + DeepSeek + 定向同步 + 备份快照
+# GitCLI.sh - v2.9 (清爽菜单版)
+# 结构优化：新增一级 "推送菜单"，收纳所有 Push 操作
+# 核心功能：全功能保留 (DeepSeek/自动Stash/目录浏览/备份)
 # ======================================================
 
 set -u
@@ -144,9 +144,8 @@ smart_commit() {
 
     if [[ -n "$msg" ]]; then
         git commit -m "$msg" && echo -e "${C_SUCCESS}🎉 提交成功!${C_RESET}"
-        echo -e "${C_WARN}🚀 是否立即推送到远程? (Y/n)${C_RESET}"
-        read -r push_ans
-        [[ -z "$push_ans" || "$push_ans" == "y" || "$push_ans" == "Y" ]] && git push
+        # 这里不需要询问推送，因为用户可以手动去 "推送菜单" 操作，逻辑更解耦
+        echo -e "${C_INFO}💡 提示：如需推送到远程，请使用主菜单的【推送菜单】${C_RESET}"
     fi
 }
 
@@ -185,8 +184,10 @@ file_history_explorer() {
 }
 
 # ----------------------------
-# 6. 高级操作 (同步/强推/备份)
+# 6. 推送功能组 (Push Submenu Functions)
 # ----------------------------
+
+# 6.1 强制推送
 smart_force_push() {
     local action=$(printf "👉 当前分支\n🔀 其他分支" | fzf --prompt="推送到哪里? > ")
     local target=$(git rev-parse --abbrev-ref HEAD)
@@ -203,11 +204,10 @@ smart_force_push() {
     [[ "$confirm" == "YES" ]] && git push --force-with-lease origin "$target" && echo -e "${C_SUCCESS}完成${C_RESET}"
 }
 
-# 【新增功能】：备份推送到新分支
+# 6.2 备份推送
 push_backup_branch() {
     local current_branch=$(git rev-parse --abbrev-ref HEAD)
     local timestamp=$(date '+%Y%m%d-%H%M')
-    # 默认备份分支名：backup/当前分支名/时间戳
     local default="backup/$current_branch/$timestamp"
     
     echo -e "${C_INFO}创建一个远程备份分支 (不影响当前本地工作区)${C_RESET}"
@@ -223,6 +223,42 @@ push_backup_branch() {
     fi
 }
 
+# 6.3 二级菜单：推送菜单
+show_push_menu() {
+    while true; do
+        # 复用 Header，保持视觉一致
+        local header_content=$(get_status_header)
+        
+        local choice=$(printf "📤 普通推送 (Standard Push)\n💾 备份推送 (Backup to New Branch)\n🧨 强制推送 (Force Push)\n🔙 返回主菜单 (Back)" | \
+            fzf --ansi --layout=reverse --border=rounded --margin=1 --header-first \
+                --height=100% --prompt="🚀 推送菜单 > " --header="$header_content")
+        
+        [[ -z "$choice" ]] && return
+
+        case "$choice" in
+            *"普通推送"*) 
+                git push 
+                echo -e "${C_INFO}按任意键返回...${C_RESET}"
+                read -n 1 -s -r
+                return ;; # 推送完返回主菜单刷新状态
+            *"备份推送"*) 
+                push_backup_branch 
+                echo -e "${C_INFO}按任意键返回...${C_RESET}"
+                read -n 1 -s -r
+                return ;;
+            *"强制推送"*) 
+                smart_force_push 
+                echo -e "${C_INFO}按任意键返回...${C_RESET}"
+                read -n 1 -s -r
+                return ;;
+            *"返回"*) return ;;
+        esac
+    done
+}
+
+# ----------------------------
+# 7. 其他逻辑
+# ----------------------------
 switch_branch_safe() {
     local target=$(git branch --format='%(refname:short)' | fzf --prompt="切换分支 > " --preview="git log --oneline --graph --color=always {} | head -20")
     if [[ -n "$target" ]]; then
@@ -250,15 +286,15 @@ sync_specific_files() {
 }
 
 # ----------------------------
-# 7. 主菜单 Loop
+# 8. 主菜单 Loop
 # ----------------------------
 main_menu() {
     while true; do
         clear 
         local header_content=$(get_status_header)
         
-        # 将 "💾 备份推送" 加回了列表
-        local choice=$(printf "🔄 刷新状态\n📥 拉取代码 (Pull)\n🚀 智能提交 (Smart Commit)\n📤 普通推送 (Push)\n💾 备份推送 (Backup)\n🧨 强制推送 (Force Push)\n🌿 切换分支 (Checkout)\n🔍 文件审计 (Explorer)\n🍒 定向同步 (Sync Files)\n📜 查看日志 (Log)\n📂 结构迁移 (Migrate)\n❌ 退出" | \
+        # 这里的菜单非常干净了
+        local choice=$(printf "🔄 刷新状态\n📥 拉取代码 (Pull)\n🚀 智能提交 (Smart Commit)\n📤 推送菜单 (Push Options)\n🌿 切换分支 (Checkout)\n🔍 文件审计 (Explorer)\n🍒 定向同步 (Sync Files)\n📜 查看日志 (Log)\n📂 结构迁移 (Migrate)\n❌ 退出" | \
             fzf --ansi --layout=reverse --border=rounded --margin=1 --header-first \
                 --height=100% --prompt="✨ GitCLI > " --header="$header_content")
 
@@ -268,9 +304,7 @@ main_menu() {
             *"刷新"*) continue ;;
             *"拉取"*) git pull ;;
             *"智能提交"*) smart_commit ;;
-            *"普通推送"*) git push ;;
-            *"备份推送"*) push_backup_branch ;;  # <--- 调用新加的备份函数
-            *"强制推送"*) smart_force_push ;;
+            *"推送菜单"*) show_push_menu ;; # <--- 进入二级菜单
             *"切换分支"*) switch_branch_safe ;;
             *"文件审计"*) file_history_explorer ;;
             *"定向同步"*) sync_specific_files ;;
@@ -281,7 +315,7 @@ main_menu() {
             *"退出"*) exit 0 ;;
         esac
 
-        if [[ "$choice" != *"刷新"* ]]; then
+        if [[ "$choice" != *"刷新"* && "$choice" != *"推送菜单"* ]]; then
             echo -e "\n${C_INFO}按任意键继续...${C_RESET}"
             read -n 1 -s -r
         fi
