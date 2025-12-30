@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
 # ======================================================
-# GitCLI.sh - v2.9 (清爽菜单版)
-# 结构优化：新增一级 "推送菜单"，收纳所有 Push 操作
-# 核心功能：全功能保留 (DeepSeek/自动Stash/目录浏览/备份)
+# GitCLI.sh - v3.0 (极致顺滑版)
+# 优化：智能提交后默认回车即推送 (Enter = Yes)
+# 结构：清爽菜单 + 目录浏览 + 自动Stash + DeepSeek
 # ======================================================
 
 set -u
@@ -30,7 +30,7 @@ check_dependencies() {
     fi
     
     if ! command -v jq >/dev/null 2>&1; then
-        echo -e "${C_WARN}未检测到 jq，AI 提交与 PR 功能将受限${C_RESET}"
+        echo -e "${C_WARN}未检测到 jq，AI 提交功能受限${C_RESET}"
     fi
     
     if [[ -n "${GITHUB_TOKEN:-}" ]]; then
@@ -79,7 +79,7 @@ has_uncommitted() {
 
 auto_stash() {
     if has_uncommitted; then
-        echo -e "${C_WARN}⚠️  检测到未提交变更（含未追踪文件），切换分支需暂存。${C_RESET}"
+        echo -e "${C_WARN}⚠️  检测到未提交变更，切换分支需暂存。${C_RESET}"
         echo -e "${C_INFO}是否自动暂存(stash)？(y/n)${C_RESET}"
         read -r -t 10 ans || ans="n"
         if [[ "$ans" == "y" || "$ans" == "Y" ]]; then
@@ -95,7 +95,7 @@ auto_stash() {
 }
 
 # ----------------------------
-# 4. 智能提交与 AI
+# 4. 智能提交与 AI (集成 DeepSeek)
 # ----------------------------
 generate_ai_commit() {
     if [[ -z "${DEEPSEEK_API_KEY:-}" ]]; then
@@ -117,17 +117,20 @@ generate_ai_commit() {
     echo "$res" | jq -r '.choices[0].message.content' 2>/dev/null
 }
 
-smart_commit() {
+smart_commit_and_push() {
+    # 1. 检查自动 Stash
     if [[ -n "$(git stash list | grep 'Auto stash by GitCLI' | tail -1)" ]]; then
          echo -e "${C_WARN}检测到自动 Stash，是否恢复？(y/n)${C_RESET}"
          read -r ans; [[ "$ans" == "y" ]] && git stash pop
     fi
 
+    # 2. 选择文件
     local files=$(git status --porcelain | fzf -m --ansi --prompt="选择文件 (Tab多选) > " \
         --preview="echo {} | awk '{print \$2}' | xargs git diff --color=always")
     [[ -z "$files" ]] && return
     echo "$files" | awk '{print $2}' | xargs git add
 
+    # 3. 生成 Message
     local mode=$(printf "✨ AI 生成 (DeepSeek)\n📝 手动输入\n🔙 取消" | fzf --prompt="Commit Message > ")
     local msg=""
     
@@ -142,10 +145,25 @@ smart_commit() {
         *) git reset; return ;;
     esac
 
+    # 4. 提交并默认推送
     if [[ -n "$msg" ]]; then
-        git commit -m "$msg" && echo -e "${C_SUCCESS}🎉 提交成功!${C_RESET}"
-        # 这里不需要询问推送，因为用户可以手动去 "推送菜单" 操作，逻辑更解耦
-        echo -e "${C_INFO}💡 提示：如需推送到远程，请使用主菜单的【推送菜单】${C_RESET}"
+        if git commit -m "$msg"; then
+            echo -e "${C_SUCCESS}🎉 本地提交成功！${C_RESET}"
+            echo ""
+            # 重点修改：默认 Yes，提示符改为 [Y/n]
+            echo -e "${C_WARN}🚀 是否立即推送到远程？ [Y/n] (默认: Yes)${C_RESET}"
+            read -r push_ans
+            
+            # 如果输入为空，默认为 Y
+            [[ -z "$push_ans" ]] && push_ans="Y"
+            
+            if [[ "$push_ans" =~ ^[Yy] ]]; then
+                echo -e "${C_INFO}⏳ 正在推送...${C_RESET}"
+                git push
+            else
+                echo -e "${C_INFO}👌 已保留在本地，未推送。${C_RESET}"
+            fi
+        fi
     fi
 }
 
@@ -184,10 +202,8 @@ file_history_explorer() {
 }
 
 # ----------------------------
-# 6. 推送功能组 (Push Submenu Functions)
+# 6. 推送功能组
 # ----------------------------
-
-# 6.1 强制推送
 smart_force_push() {
     local action=$(printf "👉 当前分支\n🔀 其他分支" | fzf --prompt="推送到哪里? > ")
     local target=$(git rev-parse --abbrev-ref HEAD)
@@ -204,7 +220,6 @@ smart_force_push() {
     [[ "$confirm" == "YES" ]] && git push --force-with-lease origin "$target" && echo -e "${C_SUCCESS}完成${C_RESET}"
 }
 
-# 6.2 备份推送
 push_backup_branch() {
     local current_branch=$(git rev-parse --abbrev-ref HEAD)
     local timestamp=$(date '+%Y%m%d-%H%M')
@@ -223,12 +238,9 @@ push_backup_branch() {
     fi
 }
 
-# 6.3 二级菜单：推送菜单
 show_push_menu() {
     while true; do
-        # 复用 Header，保持视觉一致
         local header_content=$(get_status_header)
-        
         local choice=$(printf "📤 普通推送 (Standard Push)\n💾 备份推送 (Backup to New Branch)\n🧨 强制推送 (Force Push)\n🔙 返回主菜单 (Back)" | \
             fzf --ansi --layout=reverse --border=rounded --margin=1 --header-first \
                 --height=100% --prompt="🚀 推送菜单 > " --header="$header_content")
@@ -236,21 +248,9 @@ show_push_menu() {
         [[ -z "$choice" ]] && return
 
         case "$choice" in
-            *"普通推送"*) 
-                git push 
-                echo -e "${C_INFO}按任意键返回...${C_RESET}"
-                read -n 1 -s -r
-                return ;; # 推送完返回主菜单刷新状态
-            *"备份推送"*) 
-                push_backup_branch 
-                echo -e "${C_INFO}按任意键返回...${C_RESET}"
-                read -n 1 -s -r
-                return ;;
-            *"强制推送"*) 
-                smart_force_push 
-                echo -e "${C_INFO}按任意键返回...${C_RESET}"
-                read -n 1 -s -r
-                return ;;
+            *"普通推送"*) git push; read -n 1 -s -r; return ;; 
+            *"备份推送"*) push_backup_branch; read -n 1 -s -r; return ;;
+            *"强制推送"*) smart_force_push; read -n 1 -s -r; return ;;
             *"返回"*) return ;;
         esac
     done
@@ -293,8 +293,8 @@ main_menu() {
         clear 
         local header_content=$(get_status_header)
         
-        # 这里的菜单非常干净了
-        local choice=$(printf "🔄 刷新状态\n📥 拉取代码 (Pull)\n🚀 智能提交 (Smart Commit)\n📤 推送菜单 (Push Options)\n🌿 切换分支 (Checkout)\n🔍 文件审计 (Explorer)\n🍒 定向同步 (Sync Files)\n📜 查看日志 (Log)\n📂 结构迁移 (Migrate)\n❌ 退出" | \
+        # 将 "智能提交" 改名为 "智能提交 & 推送"，更符合逻辑
+        local choice=$(printf "🔄 刷新状态\n📥 拉取代码 (Pull)\n🚀 智能提交 & 推送 (Smart Commit & Push)\n📤 推送菜单 (Push Options)\n🌿 切换分支 (Checkout)\n🔍 文件审计 (Explorer)\n🍒 定向同步 (Sync Files)\n📜 查看日志 (Log)\n📂 结构迁移 (Migrate)\n❌ 退出" | \
             fzf --ansi --layout=reverse --border=rounded --margin=1 --header-first \
                 --height=100% --prompt="✨ GitCLI > " --header="$header_content")
 
@@ -303,8 +303,8 @@ main_menu() {
         case "$choice" in
             *"刷新"*) continue ;;
             *"拉取"*) git pull ;;
-            *"智能提交"*) smart_commit ;;
-            *"推送菜单"*) show_push_menu ;; # <--- 进入二级菜单
+            *"智能提交"*) smart_commit_and_push ;;
+            *"推送菜单"*) show_push_menu ;; 
             *"切换分支"*) switch_branch_safe ;;
             *"文件审计"*) file_history_explorer ;;
             *"定向同步"*) sync_specific_files ;;
