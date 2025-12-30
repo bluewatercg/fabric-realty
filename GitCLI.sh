@@ -130,7 +130,7 @@ smart_migration() {
     echo -e "${C_INFO}检测到新文件，执行自动化迁移提交？(y/n)${C_RESET}"
     read -r ans; [[ "$ans" == "y" ]] && git add -A && git commit -m "refactor: structural migration" && git push
 }
-
+ 
 # ----------------------------
 # 主菜单 (彻底解决对齐与显示问题)
 # ----------------------------
