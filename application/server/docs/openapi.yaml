@@ -1,0 +1,588 @@
+openapi: 3.0.3
+info:
+  title: 供应链协同系统 API 文档
+  version: 1.0.0
+  description: |
+    基于 Hyperledger Fabric 的汽配供应链协同系统 API 文档
+    
+    本系统提供完整的供应链协同管理功能，包括：
+    - 订单管理
+    - 物流追踪
+    - 状态更新
+    - 审计追溯
+  termsOfService: http://swagger.io/terms/
+  contact:
+    name: API Support
+    url: http://www.swagger.io/support
+    email: support@swagger.io
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+
+servers:
+  - url: http://192.168.1.41:8080/api
+    description: 生产环境服务器
+  - url: https://192.168.1.41:8080/api
+    description: 生产环境服务器 (HTTPS)
+  - url: http://localhost:8080/api
+    description: 本地开发服务器
+
+tags:
+  - name: OEM
+    description: 主机厂相关接口 - 订单创建、查询、签收等操作
+  - name: Manufacturer
+    description: 零部件厂商相关接口 - 订单接受、状态更新等操作
+  - name: Carrier
+    description: 承运商相关接口 - 取货、物流追踪、位置更新等操作
+  - name: Platform
+    description: 平台方相关接口 - 数据监管、审计追溯等操作
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /api/oem/order/create:
+    post:
+      tags:
+        - OEM
+      summary: 主机厂创建采购订单
+      description: OEM 创建新的采购订单，订单状态为 CREATED
+      operationId: createOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderRequest'
+            examples:
+              example1:
+                summary: 创建发动机零件订单
+                value:
+                  id: "ORDER_2024_001"
+                  manufacturerId: "MANUFACTURER_A"
+                  items:
+                    - name: "engine_part_xyz"
+                      quantity: 100
+      responses:
+        '200':
+          description: 订单创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    message: "订单已发布"
+                    data: null
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/oem/order/{id}:
+    get:
+      tags:
+        - OEM
+      summary: 查询订单详情
+      description: 根据订单ID查询订单详细信息
+      operationId: queryOrder
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/oem/order/{id}/history:
+    get:
+      tags:
+        - OEM
+      summary: 查询订单历史记录
+      description: 查询订单的完整状态变更历史，展示区块链不可篡改的审计追踪
+      operationId: queryOrderHistory
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/oem/order/{id}/receive:
+    put:
+      tags:
+        - OEM
+      summary: OEM 确认收货
+      description: OEM 确认收货，订单状态变为 RECEIVED
+      operationId: confirmReceipt
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: 签收成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    message: "订单已签收完成"
+                    data: null
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/oem/order/list:
+    get:
+      tags:
+        - OEM
+      summary: 查询订单列表
+      description: 分页查询订单列表，支持根据角色过滤
+      operationId: queryOrderList
+      parameters:
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Bookmark'
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/manufacturer/order/{id}/accept:
+    put:
+      tags:
+        - Manufacturer
+      summary: 零部件厂商接受订单
+      description: Manufacturer 接受 OEM 创建的订单，状态变为 ACCEPTED
+      operationId: acceptOrder
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      responses:
+        '200':
+          description: 接受成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    message: "订单已接受"
+                    data: null
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/manufacturer/order/{id}/status:
+    put:
+      tags:
+        - Manufacturer
+      summary: 更新生产状态
+      description: Manufacturer 更新订单的生产状态 (PRODUCING/PRODUCED/READY)
+      operationId: updateStatus
+      parameters:
+        - $ref: '#/components/parameters/OrderId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateStatusRequest'
+            examples:
+              producing:
+                summary: 更新为生产中
+                value:
+                  status: "PRODUCING"
+              produced:
+                summary: 更新为已生产
+                value:
+                  status: "PRODUCED"
+              ready:
+                summary: 更新为待发货
+                value:
+                  status: "READY"
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/manufacturer/order/list:
+    get:
+      tags:
+        - Manufacturer
+      summary: 查询订单列表
+      description: 分页查询订单列表
+      operationId: queryManufacturerOrderList
+      parameters:
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Bookmark'
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/carrier/shipment/pickup:
+    post:
+      tags:
+        - Carrier
+      summary: 承运商取货
+      description: Carrier 取货并生成物流单，订单状态变为 READY
+      operationId: pickupGoods
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PickupGoodsRequest'
+            examples:
+              example1:
+                summary: 取货示例
+                value:
+                  orderId: "ORDER_2024_001"
+                  shipmentId: "SHIPMENT_2024_001"
+      responses:
+        '200':
+          description: 取货成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/carrier/shipment/{id}:
+    get:
+      tags:
+        - Carrier
+      summary: 查询物流详情
+      description: 查询物流单的详细信息
+      operationId: queryShipment
+      parameters:
+        - $ref: '#/components/parameters/ShipmentId'
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/carrier/shipment/{id}/history:
+    get:
+      tags:
+        - Carrier
+      summary: 查询物流单历史记录
+      description: 查询物流单的完整位置变更历史
+      operationId: queryShipmentHistory
+      parameters:
+        - $ref: '#/components/parameters/ShipmentId'
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/carrier/shipment/{id}/location:
+    put:
+      tags:
+        - Carrier
+      summary: 更新物流位置
+      description: Carrier 更新物流单的位置信息
+      operationId: updateLocation
+      parameters:
+        - $ref: '#/components/parameters/ShipmentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLocationRequest'
+            examples:
+              example1:
+                summary: 更新位置示例
+                value:
+                  location: "SHANGHAI_PORT"
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/carrier/order/list:
+    get:
+      tags:
+        - Carrier
+      summary: 查询订单列表
+      description: 分页查询订单列表
+      operationId: queryCarrierOrderList
+      parameters:
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Bookmark'
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/platform/all:
+    get:
+      tags:
+        - Platform
+      summary: 查询所有账本数据及完整历史变更记录
+      description: 查询账本上所有资产（订单和物流单）的当前状态及其完整的历史变更记录，用于审计和追溯
+      operationId: queryAllLedgerData
+      parameters:
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Bookmark'
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/platform/order/list:
+    get:
+      tags:
+        - Platform
+      summary: 查询订单列表
+      description: 分页查询订单列表
+      operationId: queryPlatformOrderList
+      parameters:
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Bookmark'
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: API 密钥认证
+
+  parameters:
+    OrderId:
+      name: id
+      in: path
+      required: true
+      description: 订单ID
+      schema:
+        type: string
+        example: "ORDER_2024_001"
+    
+    ShipmentId:
+      name: id
+      in: path
+      required: true
+      description: 物流单ID
+      schema:
+        type: string
+        example: "SHIPMENT_2024_001"
+    
+    PageSize:
+      name: pageSize
+      in: query
+      required: false
+      description: 每页数量
+      schema:
+        type: integer
+        default: 10
+        minimum: 1
+        maximum: 100
+    
+    Bookmark:
+      name: bookmark
+      in: query
+      required: false
+      description: 分页书签（用于获取下一页数据）
+      schema:
+        type: string
+
+  schemas:
+    CreateOrderRequest:
+      type: object
+      required:
+        - id
+        - manufacturerId
+        - items
+      properties:
+        id:
+          type: string
+          description: 订单ID
+          example: "ORDER_2024_001"
+        manufacturerId:
+          type: string
+          description: 制造商ID
+          example: "MANUFACTURER_A"
+        items:
+          type: array
+          description: 订单项目列表
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+                description: 零件名称
+              quantity:
+                type: integer
+                description: 数量
+          example:
+            - name: "engine_part_xyz"
+              quantity: 100
+
+    UpdateStatusRequest:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          description: 生产状态
+          enum:
+            - PRODUCING
+            - PRODUCED
+            - READY
+          example: "PRODUCING"
+
+    PickupGoodsRequest:
+      type: object
+      required:
+        - orderId
+        - shipmentId
+      properties:
+        orderId:
+          type: string
+          description: 订单ID
+          example: "ORDER_2024_001"
+        shipmentId:
+          type: string
+          description: 物流单ID
+          example: "SHIPMENT_2024_001"
+
+    UpdateLocationRequest:
+      type: object
+      required:
+        - location
+      properties:
+        location:
+          type: string
+          description: 当前位置
+          example: "SHANGHAI_PORT"
+
+    SuccessResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          description: 响应码
+          example: 200
+        message:
+          type: string
+          description: 响应消息
+          example: "操作成功"
+        data:
+          description: 响应数据
+          oneOf:
+            - type: object
+            - type: array
+            - type: string
+            - type: 'null'
+
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          description: 错误码
+          example: 400
+        message:
+          type: string
+          description: 错误消息
+          example: "请求参数错误"
+        data:
+          type: 'null'
+
+  responses:
+    BadRequest:
+      description: 请求参数错误
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            badRequest:
+              value:
+                code: 400
+                message: "无效的请求参数"
+                data: null
+
+    InternalError:
+      description: 服务器内部错误
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            internalError:
+              value:
+                code: 500
+                message: "服务器内部错误"
+                data: null

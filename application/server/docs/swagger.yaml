@@ -5,23 +5,38 @@ definitions:
   api.PickupGoodsRequest:
     properties:
       orderId:
+        description: 订单ID
         example: ORDER_2024_001
         type: string
       shipmentId:
+        description: 物流单ID
         example: SHIPMENT_2024_001
         type: string
+    required:
+    - orderId
+    - shipmentId
     type: object
   api.UpdateLocationRequest:
     properties:
       location:
+        description: 当前位置
         example: SHANGHAI_PORT
         type: string
+    required:
+    - location
     type: object
   api.UpdateStatusRequest:
     properties:
       status:
+        description: 生产状态：PRODUCING(生产中)/PRODUCED(已生产)/READY(待发货)
+        enum:
+        - PRODUCING
+        - PRODUCED
+        - READY
         example: PRODUCING
         type: string
+    required:
+    - status
     type: object
   utils.Response:
     properties:
@@ -33,12 +48,21 @@ definitions:
     type: object
 host: 192.168.1.41:8080
 info:
-  contact: {}
-  description: 基于 Hyperledger Fabric 的汽配供应链协同系统 API 文档
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: |-
+    基于 Hyperledger Fabric 的汽配供应链协同系统 API 文档
+    本系统提供完整的供应链协同管理功能，包括订单管理、物流追踪、状态更新等
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
   title: 供应链协同系统 API 文档
   version: "1.0"
 paths:
-  /api/carrier/shipment/{id}:
+  /carrier/shipment/{id}:
     get:
       consumes:
       - application/json
@@ -59,7 +83,7 @@ paths:
       summary: 查询物流详情
       tags:
       - Carrier
-  /api/carrier/shipment/{id}/history:
+  /carrier/shipment/{id}/history:
     get:
       consumes:
       - application/json
@@ -80,7 +104,7 @@ paths:
       summary: 查询物流单历史记录
       tags:
       - Carrier
-  /api/carrier/shipment/{id}/location:
+  /carrier/shipment/{id}/location:
     put:
       consumes:
       - application/json
@@ -107,7 +131,7 @@ paths:
       summary: 更新物流位置
       tags:
       - Carrier
-  /api/carrier/shipment/pickup:
+  /carrier/shipment/pickup:
     post:
       consumes:
       - application/json
@@ -129,7 +153,7 @@ paths:
       summary: 承运商取货
       tags:
       - Carrier
-  /api/manufacturer/order/{id}/accept:
+  /manufacturer/order/{id}/accept:
     put:
       consumes:
       - application/json
@@ -150,7 +174,7 @@ paths:
       summary: 零部件厂商接受订单
       tags:
       - Manufacturer
-  /api/manufacturer/order/{id}/status:
+  /manufacturer/order/{id}/status:
     put:
       consumes:
       - application/json
@@ -177,7 +201,7 @@ paths:
       summary: 更新生产状态
       tags:
       - Manufacturer
-  /api/oem/order/{id}:
+  /oem/order/{id}:
     get:
       consumes:
       - application/json
@@ -198,7 +222,7 @@ paths:
       summary: 查询订单详情
       tags:
       - OEM
-  /api/oem/order/{id}/history:
+  /oem/order/{id}/history:
     get:
       consumes:
       - application/json
@@ -219,7 +243,7 @@ paths:
       summary: 查询订单历史记录
       tags:
       - OEM
-  /api/oem/order/{id}/receive:
+  /oem/order/{id}/receive:
     put:
       consumes:
       - application/json
@@ -240,7 +264,7 @@ paths:
       summary: OEM 确认收货
       tags:
       - OEM
-  /api/oem/order/create:
+  /oem/order/create:
     post:
       consumes:
       - application/json
@@ -256,13 +280,26 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: 订单创建成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  type: string
+              type: object
+        "400":
+          description: 请求参数错误
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "500":
+          description: 服务器内部错误
           schema:
             $ref: '#/definitions/utils.Response'
       summary: 主机厂创建采购订单
       tags:
       - OEM
-  /api/oem/order/list:
+  /oem/order/list:
     get:
       consumes:
       - application/json
@@ -287,7 +324,7 @@ paths:
       summary: 查询订单列表
       tags:
       - OEM
-  /api/platform/all:
+  /platform/all:
     get:
       consumes:
       - application/json
@@ -312,4 +349,23 @@ paths:
       summary: 查询所有账本数据及完整历史变更记录
       tags:
       - Platform
+produces:
+- application/json
+schemes:
+- http
+- https
+securityDefinitions:
+  ApiKeyAuth:
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"
+tags:
+- description: 主机厂相关接口 - 订单创建、查询、签收等操作
+  name: OEM
+- description: 零部件厂商相关接口 - 订单接受、状态更新等操作
+  name: Manufacturer
+- description: 承运商相关接口 - 取货、物流追踪、位置更新等操作
+  name: Carrier
+- description: 平台方相关接口 - 数据监管、审计追溯等操作
+  name: Platform

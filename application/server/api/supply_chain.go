@@ -3,9 +3,10 @@ package api
 import (
 	"application/service"
 	"application/utils"
-	"github.com/gin-gonic/gin"
 	"log"
 	"strconv"
+
+	"github.com/gin-gonic/gin"
 )
 
 type SupplyChainHandler struct {
@@ -18,21 +19,24 @@ func NewSupplyChainHandler() *SupplyChainHandler {
 	}
 }
 
+// CreateOrderRequest 创建订单请求
 type CreateOrderRequest struct {
-	ID             string      `json:"id" example:"ORDER_2024_001"`
-	ManufacturerID string      `json:"manufacturerId" example:"MANUFACTURER_A"`
-	Items          interface{} `json:"items" example:"[{\"name\":\"engine_part_xyz\",\"quantity\":100}]"`
+	ID             string      `json:"id" example:"ORDER_2024_001" binding:"required"`                                       // 订单ID
+	ManufacturerID string      `json:"manufacturerId" example:"MANUFACTURER_A" binding:"required"`                           // 制造商ID
+	Items          interface{} `json:"items" example:"[{\"name\":\"engine_part_xyz\",\"quantity\":100}]" binding:"required"` // 订单项目列表
 }
 
 // CreateOrder 主机厂发布订单
-// @Summary 主机厂创建采购订单
-// @Description OEM 创建新的采购订单，订单状态为 CREATED
-// @Tags OEM
-// @Accept json
-// @Produce json
-// @Param order body CreateOrderRequest true "订单信息"
-// @Success 200 {object} utils.Response
-// @Router /api/oem/order/create [post]
+// @Summary      主机厂创建采购订单
+// @Description  OEM 创建新的采购订单，订单状态为 CREATED
+// @Tags         OEM
+// @Accept       json
+// @Produce      json
+// @Param        order  body      CreateOrderRequest  true  "订单信息"
+// @Success      200    {object}  utils.Response{data=string}  "订单创建成功"
+// @Failure      400    {object}  utils.Response  "请求参数错误"
+// @Failure      500    {object}  utils.Response  "服务器内部错误"
+// @Router       /oem/order/create [post]
 func (h *SupplyChainHandler) CreateOrder(c *gin.Context) {
 	var req CreateOrderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -57,7 +61,7 @@ func (h *SupplyChainHandler) CreateOrder(c *gin.Context) {
 // @Produce json
 // @Param id path string true "订单ID"
 // @Success 200 {object} utils.Response
-// @Router /api/manufacturer/order/{id}/accept [put]
+// @Router /manufacturer/order/{id}/accept [put]
 func (h *SupplyChainHandler) AcceptOrder(c *gin.Context) {
 	id := c.Param("id")
 	if err := h.scService.AcceptOrder(id); err != nil {
@@ -68,8 +72,9 @@ func (h *SupplyChainHandler) AcceptOrder(c *gin.Context) {
 	utils.SuccessWithMessage(c, "订单已接受", nil)
 }
 
+// UpdateStatusRequest 更新状态请求
 type UpdateStatusRequest struct {
-	Status string `json:"status" example:"PRODUCING"`
+	Status string `json:"status" example:"PRODUCING" binding:"required" enums:"PRODUCING,PRODUCED,READY"` // 生产状态：PRODUCING(生产中)/PRODUCED(已生产)/READY(待发货)
 }
 
 // UpdateStatus 更新状态
@@ -81,7 +86,7 @@ type UpdateStatusRequest struct {
 // @Param id path string true "订单ID"
 // @Param status body UpdateStatusRequest true "新状态"
 // @Success 200 {object} utils.Response
-// @Router /api/manufacturer/order/{id}/status [put]
+// @Router /manufacturer/order/{id}/status [put]
 func (h *SupplyChainHandler) UpdateStatus(c *gin.Context) {
 	id := c.Param("id")
 	var req UpdateStatusRequest
@@ -100,9 +105,10 @@ func (h *SupplyChainHandler) UpdateStatus(c *gin.Context) {
 	utils.SuccessWithMessage(c, "状态已更新", nil)
 }
 
+// PickupGoodsRequest 取货请求
 type PickupGoodsRequest struct {
-	OrderID    string `json:"orderId" example:"ORDER_2024_001"`
-	ShipmentID string `json:"shipmentId" example:"SHIPMENT_2024_001"`
+	OrderID    string `json:"orderId" example:"ORDER_2024_001" binding:"required"`       // 订单ID
+	ShipmentID string `json:"shipmentId" example:"SHIPMENT_2024_001" binding:"required"` // 物流单ID
 }
 
 // PickupGoods 承运商取货
@@ -113,7 +119,7 @@ type PickupGoodsRequest struct {
 // @Produce json
 // @Param data body PickupGoodsRequest true "取货信息"
 // @Success 200 {object} utils.Response
-// @Router /api/carrier/shipment/pickup [post]
+// @Router /carrier/shipment/pickup [post]
 func (h *SupplyChainHandler) PickupGoods(c *gin.Context) {
 	var req PickupGoodsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -128,8 +134,9 @@ func (h *SupplyChainHandler) PickupGoods(c *gin.Context) {
 	utils.SuccessWithMessage(c, "已取货并生成物流单", nil)
 }
 
+// UpdateLocationRequest 更新位置请求
 type UpdateLocationRequest struct {
-	Location string `json:"location" example:"SHANGHAI_PORT"`
+	Location string `json:"location" example:"SHANGHAI_PORT" binding:"required"` // 当前位置
 }
 
 // UpdateLocation 更新物流位置
@@ -141,7 +148,7 @@ type UpdateLocationRequest struct {
 // @Param id path string true "物流单ID"
 // @Param location body UpdateLocationRequest true "位置信息"
 // @Success 200 {object} utils.Response
-// @Router /api/carrier/shipment/{id}/location [put]
+// @Router /carrier/shipment/{id}/location [put]
 func (h *SupplyChainHandler) UpdateLocation(c *gin.Context) {
 	id := c.Param("id") // shipmentId
 	var req UpdateLocationRequest
@@ -165,7 +172,7 @@ func (h *SupplyChainHandler) UpdateLocation(c *gin.Context) {
 // @Produce json
 // @Param id path string true "订单ID"
 // @Success 200 {object} utils.Response
-// @Router /api/oem/order/{id}/receive [put]
+// @Router /oem/order/{id}/receive [put]
 func (h *SupplyChainHandler) ConfirmReceipt(c *gin.Context) {
 	id := c.Param("id")
 	if err := h.scService.ConfirmReceipt(id); err != nil {
@@ -183,7 +190,7 @@ func (h *SupplyChainHandler) ConfirmReceipt(c *gin.Context) {
 // @Produce json
 // @Param id path string true "物流单ID"
 // @Success 200 {object} utils.Response
-// @Router /api/carrier/shipment/{id} [get]
+// @Router /carrier/shipment/{id} [get]
 func (h *SupplyChainHandler) QueryShipment(c *gin.Context) {
 	id := c.Param("id")
 	shipment, err := h.scService.QueryShipment(id)
@@ -202,7 +209,7 @@ func (h *SupplyChainHandler) QueryShipment(c *gin.Context) {
 // @Produce json
 // @Param id path string true "订单ID"
 // @Success 200 {object} utils.Response
-// @Router /api/oem/order/{id} [get]
+// @Router /oem/order/{id} [get]
 func (h *SupplyChainHandler) QueryOrder(c *gin.Context) {
 	id := c.Param("id")
 	order, err := h.scService.QueryOrder(id)
@@ -222,7 +229,7 @@ func (h *SupplyChainHandler) QueryOrder(c *gin.Context) {
 // @Param pageSize query int false "每页数量" default(10)
 // @Param bookmark query string false "分页书签"
 // @Success 200 {object} utils.Response
-// @Router /api/oem/order/list [get]
+// @Router /oem/order/list [get]
 func (h *SupplyChainHandler) QueryOrderList(c *gin.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
 	bookmark := c.DefaultQuery("bookmark", "")
@@ -245,7 +252,7 @@ func (h *SupplyChainHandler) QueryOrderList(c *gin.Context) {
 // @Produce json
 // @Param id path string true "订单ID"
 // @Success 200 {object} utils.Response
-// @Router /api/oem/order/{id}/history [get]
+// @Router /oem/order/{id}/history [get]
 func (h *SupplyChainHandler) QueryOrderHistory(c *gin.Context) {
 	id := c.Param("id")
 	history, err := h.scService.QueryOrderHistory(id)
@@ -265,7 +272,7 @@ func (h *SupplyChainHandler) QueryOrderHistory(c *gin.Context) {
 // @Produce json
 // @Param id path string true "物流单ID"
 // @Success 200 {object} utils.Response
-// @Router /api/carrier/shipment/{id}/history [get]
+// @Router /carrier/shipment/{id}/history [get]
 func (h *SupplyChainHandler) QueryShipmentHistory(c *gin.Context) {
 	id := c.Param("id")
 	history, err := h.scService.QueryShipmentHistory(id)
@@ -286,7 +293,7 @@ func (h *SupplyChainHandler) QueryShipmentHistory(c *gin.Context) {
 // @Param pageSize query int false "每页数量" default(10)
 // @Param bookmark query string false "分页书签"
 // @Success 200 {object} utils.Response
-// @Router /api/platform/all [get]
+// @Router /platform/all [get]
 func (h *SupplyChainHandler) QueryAllLedgerData(c *gin.Context) {
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "10"))
 	bookmark := c.DefaultQuery("bookmark", "")

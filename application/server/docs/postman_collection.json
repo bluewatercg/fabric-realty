@@ -1,0 +1,460 @@
+{
+    "info": {
+        "name": "供应链协同系统 API",
+        "description": "基于 Hyperledger Fabric 的汽配供应链协同系统 API 测试集合",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://192.168.1.41:8080/api",
+            "type": "string"
+        },
+        {
+            "key": "orderId",
+            "value": "ORDER_2024_001",
+            "type": "string"
+        },
+        {
+            "key": "shipmentId",
+            "value": "SHIPMENT_2024_001",
+            "type": "string"
+        }
+    ],
+    "item": [
+        {
+            "name": "OEM - 主机厂",
+            "item": [
+                {
+                    "name": "创建采购订单",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"id\": \"{{orderId}}\",\n  \"manufacturerId\": \"MANUFACTURER_A\",\n  \"items\": [\n    {\n      \"name\": \"engine_part_xyz\",\n      \"quantity\": 100\n    }\n  ]\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/oem/order/create",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "oem",
+                                "order",
+                                "create"
+                            ]
+                        },
+                        "description": "OEM 创建新的采购订单"
+                    }
+                },
+                {
+                    "name": "查询订单详情",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/oem/order/{{orderId}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "oem",
+                                "order",
+                                "{{orderId}}"
+                            ]
+                        },
+                        "description": "根据订单ID查询订单详细信息"
+                    }
+                },
+                {
+                    "name": "查询订单历史",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/oem/order/{{orderId}}/history",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "oem",
+                                "order",
+                                "{{orderId}}",
+                                "history"
+                            ]
+                        },
+                        "description": "查询订单的完整状态变更历史"
+                    }
+                },
+                {
+                    "name": "确认收货",
+                    "request": {
+                        "method": "PUT",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/oem/order/{{orderId}}/receive",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "oem",
+                                "order",
+                                "{{orderId}}",
+                                "receive"
+                            ]
+                        },
+                        "description": "OEM 确认收货"
+                    }
+                },
+                {
+                    "name": "查询订单列表",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/oem/order/list?pageSize=10",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "oem",
+                                "order",
+                                "list"
+                            ],
+                            "query": [
+                                {
+                                    "key": "pageSize",
+                                    "value": "10"
+                                }
+                            ]
+                        },
+                        "description": "分页查询订单列表"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Manufacturer - 零部件厂商",
+            "item": [
+                {
+                    "name": "接受订单",
+                    "request": {
+                        "method": "PUT",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/manufacturer/order/{{orderId}}/accept",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "manufacturer",
+                                "order",
+                                "{{orderId}}",
+                                "accept"
+                            ]
+                        },
+                        "description": "零部件厂商接受订单"
+                    }
+                },
+                {
+                    "name": "更新生产状态 - 生产中",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"status\": \"PRODUCING\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/manufacturer/order/{{orderId}}/status",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "manufacturer",
+                                "order",
+                                "{{orderId}}",
+                                "status"
+                            ]
+                        },
+                        "description": "更新订单状态为生产中"
+                    }
+                },
+                {
+                    "name": "更新生产状态 - 已生产",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"status\": \"PRODUCED\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/manufacturer/order/{{orderId}}/status",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "manufacturer",
+                                "order",
+                                "{{orderId}}",
+                                "status"
+                            ]
+                        },
+                        "description": "更新订单状态为已生产"
+                    }
+                },
+                {
+                    "name": "更新生产状态 - 待发货",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"status\": \"READY\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/manufacturer/order/{{orderId}}/status",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "manufacturer",
+                                "order",
+                                "{{orderId}}",
+                                "status"
+                            ]
+                        },
+                        "description": "更新订单状态为待发货"
+                    }
+                },
+                {
+                    "name": "查询订单列表",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/manufacturer/order/list?pageSize=10",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "manufacturer",
+                                "order",
+                                "list"
+                            ],
+                            "query": [
+                                {
+                                    "key": "pageSize",
+                                    "value": "10"
+                                }
+                            ]
+                        },
+                        "description": "分页查询订单列表"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Carrier - 承运商",
+            "item": [
+                {
+                    "name": "取货并生成物流单",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"shipmentId\": \"{{shipmentId}}\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/carrier/shipment/pickup",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "carrier",
+                                "shipment",
+                                "pickup"
+                            ]
+                        },
+                        "description": "承运商取货并生成物流单"
+                    }
+                },
+                {
+                    "name": "查询物流详情",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/carrier/shipment/{{shipmentId}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "carrier",
+                                "shipment",
+                                "{{shipmentId}}"
+                            ]
+                        },
+                        "description": "查询物流单的详细信息"
+                    }
+                },
+                {
+                    "name": "查询物流历史",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/carrier/shipment/{{shipmentId}}/history",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "carrier",
+                                "shipment",
+                                "{{shipmentId}}",
+                                "history"
+                            ]
+                        },
+                        "description": "查询物流单的完整位置变更历史"
+                    }
+                },
+                {
+                    "name": "更新物流位置",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"location\": \"SHANGHAI_PORT\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/carrier/shipment/{{shipmentId}}/location",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "carrier",
+                                "shipment",
+                                "{{shipmentId}}",
+                                "location"
+                            ]
+                        },
+                        "description": "更新物流单的位置信息"
+                    }
+                },
+                {
+                    "name": "查询订单列表",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/carrier/order/list?pageSize=10",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "carrier",
+                                "order",
+                                "list"
+                            ],
+                            "query": [
+                                {
+                                    "key": "pageSize",
+                                    "value": "10"
+                                }
+                            ]
+                        },
+                        "description": "分页查询订单列表"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Platform - 平台方",
+            "item": [
+                {
+                    "name": "查询所有账本数据",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/platform/all?pageSize=10",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "platform",
+                                "all"
+                            ],
+                            "query": [
+                                {
+                                    "key": "pageSize",
+                                    "value": "10"
+                                }
+                            ]
+                        },
+                        "description": "查询账本上所有资产的当前状态及完整历史"
+                    }
+                },
+                {
+                    "name": "查询订单列表",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/platform/order/list?pageSize=10",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "platform",
+                                "order",
+                                "list"
+                            ],
+                            "query": [
+                                {
+                                    "key": "pageSize",
+                                    "value": "10"
+                                }
+                            ]
+                        },
+                        "description": "分页查询订单列表"
+                    }
+                }
+            ]
+        }
+    ]
+}

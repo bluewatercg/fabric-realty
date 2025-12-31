@@ -7,17 +7,48 @@ import (
 	"fmt"
 	"log"
 
+	_ "application/docs"
+
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"     // Corrected: import files and alias it
 	ginSwagger "github.com/swaggo/gin-swagger" // Corrected: import gin-swagger
-	_ "application/docs"
 )
 
-// @title 供应链协同系统 API 文档
-// @version 1.0
-// @description 基于 Hyperledger Fabric 的汽配供应链协同系统 API 文档
-// @host 192.168.1.41:8080
-// @BasePath /api
+// @title           供应链协同系统 API 文档
+// @version         1.0
+// @description     基于 Hyperledger Fabric 的汽配供应链协同系统 API 文档
+// @description     本系统提供完整的供应链协同管理功能，包括订单管理、物流追踪、状态更新等
+// @termsOfService  http://swagger.io/terms/
+
+// @contact.name   API Support
+// @contact.url    http://www.swagger.io/support
+// @contact.email  support@swagger.io
+
+// @license.name  Apache 2.0
+// @license.url   http://www.apache.org/licenses/LICENSE-2.0.html
+
+// @host      192.168.1.41:8080
+// @BasePath  /api
+
+// @schemes http https
+// @produce application/json
+// @consumes application/json
+
+// @tag.name OEM
+// @tag.description 主机厂相关接口 - 订单创建、查询、签收等操作
+
+// @tag.name Manufacturer
+// @tag.description 零部件厂商相关接口 - 订单接受、状态更新等操作
+
+// @tag.name Carrier
+// @tag.description 承运商相关接口 - 取货、物流追踪、位置更新等操作
+
+// @tag.name Platform
+// @tag.description 平台方相关接口 - 数据监管、审计追溯等操作
+
+// @securityDefinitions.apikey ApiKeyAuth
+// @in header
+// @name Authorization
 
 func main() {
 	// 初始化配置

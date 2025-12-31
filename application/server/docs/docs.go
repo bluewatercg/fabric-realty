@@ -5,17 +5,29 @@ import "github.com/swaggo/swag"
 
 const docTemplate = `{
     "schemes": {{ marshal .Schemes }},
+    "produces": [
+        "application/json"
+    ],
     "swagger": "2.0",
     "info": {
         "description": "{{escape .Description}}",
         "title": "{{.Title}}",
-        "contact": {},
+        "termsOfService": "http://swagger.io/terms/",
+        "contact": {
+            "name": "API Support",
+            "url": "http://www.swagger.io/support",
+            "email": "support@swagger.io"
+        },
+        "license": {
+            "name": "Apache 2.0",
+            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+        },
         "version": "{{.Version}}"
     },
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/api/carrier/shipment/pickup": {
+        "/carrier/shipment/pickup": {
             "post": {
                 "description": "Carrier 取货并生成物流单，订单状态变为 READY",
                 "consumes": [
@@ -49,7 +61,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/carrier/shipment/{id}": {
+        "/carrier/shipment/{id}": {
             "get": {
                 "description": "查询物流单的详细信息",
                 "consumes": [
@@ -81,7 +93,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/carrier/shipment/{id}/history": {
+        "/carrier/shipment/{id}/history": {
             "get": {
                 "description": "查询物流单的完整位置变更历史",
                 "consumes": [
@@ -113,7 +125,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/carrier/shipment/{id}/location": {
+        "/carrier/shipment/{id}/location": {
             "put": {
                 "description": "Carrier 更新物流单的位置信息",
                 "consumes": [
@@ -154,7 +166,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/manufacturer/order/{id}/accept": {
+        "/manufacturer/order/{id}/accept": {
             "put": {
                 "description": "Manufacturer 接受 OEM 创建的订单，状态变为 ACCEPTED",
                 "consumes": [
@@ -186,7 +198,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/manufacturer/order/{id}/status": {
+        "/manufacturer/order/{id}/status": {
             "put": {
                 "description": "Manufacturer 更新订单的生产状态 (PRODUCING/PRODUCED/READY)",
                 "consumes": [
@@ -227,7 +239,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/oem/order/create": {
+        "/oem/order/create": {
             "post": {
                 "description": "OEM 创建新的采购订单，订单状态为 CREATED",
                 "consumes": [
@@ -253,7 +265,31 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "订单创建成功",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "500": {
+                        "description": "服务器内部错误",
                         "schema": {
                             "$ref": "#/definitions/utils.Response"
                         }
@@ -261,7 +297,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/oem/order/list": {
+        "/oem/order/list": {
             "get": {
                 "description": "分页查询订单列表，支持根据角色过滤",
                 "consumes": [
@@ -299,7 +335,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/oem/order/{id}": {
+        "/oem/order/{id}": {
             "get": {
                 "description": "根据订单ID查询订单详细信息",
                 "consumes": [
@@ -331,7 +367,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/oem/order/{id}/history": {
+        "/oem/order/{id}/history": {
             "get": {
                 "description": "查询订单的完整状态变更历史，展示区块链不可篡改的审计追踪",
                 "consumes": [
@@ -363,7 +399,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/oem/order/{id}/receive": {
+        "/oem/order/{id}/receive": {
             "put": {
                 "description": "OEM 确认收货，订单状态变为 RECEIVED",
                 "consumes": [
@@ -395,7 +431,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/platform/all": {
+        "/platform/all": {
             "get": {
                 "description": "查询账本上所有资产（订单和物流单）的当前状态及其完整的历史变更记录，用于审计和追溯",
                 "consumes": [
@@ -440,12 +476,18 @@ const docTemplate = `{
         },
         "api.PickupGoodsRequest": {
             "type": "object",
+            "required": [
+                "orderId",
+                "shipmentId"
+            ],
             "properties": {
                 "orderId": {
+                    "description": "订单ID",
                     "type": "string",
                     "example": "ORDER_2024_001"
                 },
                 "shipmentId": {
+                    "description": "物流单ID",
                     "type": "string",
                     "example": "SHIPMENT_2024_001"
                 }
@@ -453,8 +495,12 @@ const docTemplate = `{
         },
         "api.UpdateLocationRequest": {
             "type": "object",
+            "required": [
+                "location"
+            ],
             "properties": {
                 "location": {
+                    "description": "当前位置",
                     "type": "string",
                     "example": "SHANGHAI_PORT"
                 }
@@ -462,9 +508,18 @@ const docTemplate = `{
         },
         "api.UpdateStatusRequest": {
             "type": "object",
+            "required": [
+                "status"
+            ],
             "properties": {
                 "status": {
+                    "description": "生产状态：PRODUCING(生产中)/PRODUCED(已生产)/READY(待发货)",
                     "type": "string",
+                    "enum": [
+                        "PRODUCING",
+                        "PRODUCED",
+                        "READY"
+                    ],
                     "example": "PRODUCING"
                 }
             }
@@ -481,7 +536,32 @@ const docTemplate = `{
                 }
             }
         }
-    }
+    },
+    "securityDefinitions": {
+        "ApiKeyAuth": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    },
+    "tags": [
+        {
+            "description": "主机厂相关接口 - 订单创建、查询、签收等操作",
+            "name": "OEM"
+        },
+        {
+            "description": "零部件厂商相关接口 - 订单接受、状态更新等操作",
+            "name": "Manufacturer"
+        },
+        {
+            "description": "承运商相关接口 - 取货、物流追踪、位置更新等操作",
+            "name": "Carrier"
+        },
+        {
+            "description": "平台方相关接口 - 数据监管、审计追溯等操作",
+            "name": "Platform"
+        }
+    ]
 }`
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
@@ -489,9 +569,9 @@ var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
 	Host:             "192.168.1.41:8080",
 	BasePath:         "/api",
-	Schemes:          []string{},
+	Schemes:          []string{"http", "https"},
 	Title:            "供应链协同系统 API 文档",
-	Description:      "基于 Hyperledger Fabric 的汽配供应链协同系统 API 文档",
+	Description:      "基于 Hyperledger Fabric 的汽配供应链协同系统 API 文档\n本系统提供完整的供应链协同管理功能，包括订单管理、物流追踪、状态更新等",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",
