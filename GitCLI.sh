@@ -424,37 +424,88 @@ inject_file_to_remote() {
 }
 
 # ----------------------------
-# 8. 主菜单 Loop
+# 8. 主菜单 Loop (重构版)
 # ----------------------------
 main_menu() {
     while true; do
         clear 
         local header_content=$(get_status_header)
         
-        # 在这里加入 "💉 远程注射"
-        local choice=$(printf "🔄 刷新状态\n📥 拉取代码 (Pull)\n🚀 智能提交 & 推送 (Smart Commit & Push)\n💉 远程注射 (Inject to Remote)\n📤 推送菜单 (Push Options)\n🌿 切换分支 (Checkout)\n🔍 文件审计 (Explorer)\n🍒 定向同步 (Sync Files)\n📜 查看日志 (Log)\n📂 结构迁移 (Migrate)\n❌ 退出" | \
-            fzf --ansi --layout=reverse --border=rounded --margin=1 --header-first \
-                --height=100% --prompt="✨ GitCLI > " --header="$header_content")
+        # 定义菜单项 (使用 ANSI 颜色增加视觉层级)
+        # 技巧：使用不可见字符或特殊符号来做分组，case 语句中用通配符匹配
+        
+        local SEP="─────────────────────────────"
+        
+        # 组装菜单列表
+        # 1. 核心开发 (高频)
+        local item_commit="🚀  智能提交 & 推送 (Smart Commit)"
+        local item_pull="📥  拉取代码 (Pull)"
+        local item_push="📤  推送选项 (Push Options)"
+        
+        # 2. 分支与审计 (中频)
+        local item_checkout="🌿  切换分支 (Checkout)"
+        local item_log="📜  查看日志 (Log)"
+        local item_explore="🔍  文件审计 (Explorer)"
+        
+        # 3. 高级工具 (低频/强力)
+        local item_inject="💉  远程文件注射 (Inject to Remote)"
+        local item_sync="🍒  本地定向同步 (Sync Files)"
+        local item_migrate="📂  结构迁移 (Migrate)"
+        
+        # 4. 系统
+        local item_refresh="🔄  刷新状态 (Refresh)"
+        local item_exit="❌  退出 (Exit)"
 
-        [[ -z "$choice" ]] && choice="🔄 刷新状态"
+        # 这里的顺序决定了显示顺序
+        local choice=$(printf "%s\n%s\n%s\n  %s\n%s\n%s\n%s\n  %s\n%s\n%s\n%s\n  %s\n%s\n%s" \
+            "$item_commit" \
+            "$item_pull" \
+            "$item_push" \
+            "${C_MENU}$SEP${C_RESET}" \
+            "$item_checkout" \
+            "$item_log" \
+            "$item_explore" \
+            "${C_MENU}$SEP${C_RESET}" \
+            "$item_inject" \
+            "$item_sync" \
+            "$item_migrate" \
+            "${C_MENU}$SEP${C_RESET}" \
+            "$item_refresh" \
+            "$item_exit" | \
+            fzf --ansi --layout=reverse --border=rounded --margin=1 --header-first \
+                --height=100% --prompt="✨ GitCLI > " --header="$header_content" \
+                --pointer="▶" --marker="✓")
+
+        [[ -z "$choice" ]] && choice="$item_refresh"
 
         case "$choice" in
-            *"刷新"*) continue ;;
-            *"拉取"*) git pull ;;
+            # 核心区
             *"智能提交"*) smart_commit_and_push ;;
-            *"远程注射"*) inject_file_to_remote ;;  # <--- 绑定新函数
-            *"推送菜单"*) show_push_menu ;; 
+            *"拉取代码"*) git pull ;;
+            *"推送选项"*) show_push_menu ;;
+            
+            # 浏览区
             *"切换分支"*) switch_branch_safe ;;
-            *"文件审计"*) file_history_explorer ;;
-            *"定向同步"*) sync_specific_files ;;
             *"查看日志"*) git log --oneline --graph --all --color=always | fzf --ansi --preview="echo {} | grep -o '[a-f0-9]\{7\}' | head -1 | xargs -I % git show --color=always %" ;;
+            *"文件审计"*) file_history_explorer ;;
+            
+            # 工具区
+            *"远程文件注射"*) inject_file_to_remote ;;
+            *"本地定向同步"*) sync_specific_files ;;
             *"结构迁移"*) 
                 git add -A && git commit -m "refactor: structural migration" && echo "本地已提交" 
                 ;;
+            
+            # 系统区
+            *"刷新状态"*) continue ;;
             *"退出"*) exit 0 ;;
+            
+            # 忽略分隔符点击
+            *SEP*) continue ;;
         esac
 
-        if [[ "$choice" != *"刷新"* && "$choice" != *"推送菜单"* && "$choice" != *"远程注射"* ]]; then
+        # 如果不是刷新或进入子菜单，暂停一下以便查看输出
+        if [[ "$choice" != *"刷新"* && "$choice" != *"推送选项"* && "$choice" != *"SEP"* ]]; then
             echo -e "\n${C_INFO}按任意键继续...${C_RESET}"
             read -n 1 -s -r
         fi
