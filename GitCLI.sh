@@ -443,8 +443,9 @@ sync_specific_files() {
     echo -e "${C_SUCCESS}同步完成${C_RESET}"
 }
 
+
 # ----------------------------
-# 10. 主菜单 Loop (UI 修复版)
+# 10. 主菜单 Loop (Refresh 置顶版)
 # ----------------------------
 main_menu() {
     while true; do
@@ -452,12 +453,15 @@ main_menu() {
         local header_content=$(get_status_header)
         local SEP="─────────────────────────────"
         
+        # 定义菜单项
+        local item_refresh="🔄  刷新状态 (Refresh)"  # <--- 移到这里定义，方便置顶
+        
         # 1. 核心开发
         local item_commit="🚀  智能提交 & 推送 (Smart Commit)"
         local item_pull="📥  拉取代码 (Pull)"
         local item_push="📤  推送选项 (Push Options)"
         
-        # 2. 浏览与审计 (UI 修复: 在眼睛后面多加一个空格，强制对齐)
+        # 2. 浏览与审计
         local item_livediff="👁️   实时变更对比 (Live Diff)" 
         local item_checkout="🌿  切换分支 (Checkout)"
         local item_log="📜  查看日志 (Log)"
@@ -469,10 +473,11 @@ main_menu() {
         local item_migrate="📂  结构迁移 (Migrate)"
         
         # 4. 系统
-        local item_refresh="🔄  刷新状态 (Refresh)"
         local item_exit="❌  退出 (Exit)"
 
-        local choice=$(printf "%s\n%s\n%s\n  %s\n%s\n%s\n%s\n%s\n  %s\n%s\n%s\n%s\n  %s\n%s\n%s" \
+        # 组装顺序：刷新 -> 核心 -> 浏览 -> 高级 -> 退出
+        local choice=$(printf "%s\n%s\n%s\n%s\n  %s\n%s\n%s\n%s\n%s\n  %s\n%s\n%s\n%s\n  %s\n%s" \
+            "$item_refresh" \
             "$item_commit" \
             "$item_pull" \
             "$item_push" \
@@ -486,7 +491,6 @@ main_menu() {
             "$item_sync" \
             "$item_migrate" \
             "${C_MENU}$SEP${C_RESET}" \
-            "$item_refresh" \
             "$item_exit" | \
             fzf --ansi --layout=reverse --border=rounded --margin=1 --header-first \
                 --height=100% --prompt="✨ GitCLI > " --header="$header_content" \
@@ -495,6 +499,7 @@ main_menu() {
         [[ -z "$choice" ]] && choice="$item_refresh"
 
         case "$choice" in
+            *"刷新状态"*) continue ;;  # <--- 逻辑已置顶
             *"智能提交"*) smart_commit_and_push ;;
             *"拉取代码"*) git pull ;;
             *"推送选项"*) show_push_menu ;;
@@ -505,7 +510,6 @@ main_menu() {
             *"远程文件注射"*) inject_file_to_remote ;;
             *"本地定向同步"*) sync_specific_files ;;
             *"结构迁移"*) git add -A && git commit -m "refactor: structural migration" && echo "本地已提交" ;;
-            *"刷新状态"*) continue ;;
             *"退出"*) exit 0 ;;
             *SEP*) continue ;;
         esac
@@ -516,6 +520,5 @@ main_menu() {
         fi
     done
 }
-
 # 启动
 main_menu
