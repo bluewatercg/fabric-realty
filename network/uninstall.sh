@@ -13,6 +13,7 @@ set -u  # 使用未定义的变量时报错
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # 日志函数
@@ -22,6 +23,10 @@ log_info() {
 
 log_success() {
     echo -e "${GREEN}[SUCCESS] $1${NC}"
+}
+
+log_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
 log_error() {
@@ -54,6 +59,12 @@ clean_containers() {
     
     # 再执行 docker-compose down
     docker-compose down --volumes --remove-orphans || log_warning "部分容器或网络未完全清理，继续尝试后续步骤..."
+
+    # 尝试移除网络，以防有残留
+    if docker network inspect fabric_togettoyou_network &>/dev/null; then
+        log_info "尝试移除残留网络 fabric_togettoyou_network..."
+        docker network rm fabric_togettoyou_network || log_warning "网络 fabric_togettoyou_network 移除失败，可能仍有活动连接。"
+    fi
     log_success "Docker容器清理完成"
 }
 
