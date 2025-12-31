@@ -26,15 +26,15 @@ echo "正在检查并构建前端..."
 echo -e "${GREEN}预编译检查通过！${NC}"
 
 echo -e "${CYAN}\n>>> 第二步：开始本地构建镜像...${NC}"
-(cd application/server && docker build -t \"$SERVER_IMAGE\" .)
-(cd application/web && docker build -t \"$WEB_IMAGE\" .)
+(cd application/server && docker build -t $SERVER_IMAGE .)
+(cd application/web && docker build -t $WEB_IMAGE .)
 echo "镜像构建完成。"
 
 echo -e "${CYAN}\n>>> 第三步：流式上传并加载镜像到服务器...${NC}"
 echo "正在上传后端镜像 ($SERVER_IMAGE)..."
-docker save \"$SERVER_IMAGE\" | ssh -o \"StrictHostKeyChecking no\" -o \"UserKnownHostsFile /dev/null\" \"${REMOTE_USER}@${REMOTE_IP}\" \"docker load\"
+docker save $SERVER_IMAGE | ssh -o "StrictHostKeyChecking no" -o "UserKnownHostsFile /dev/null" "${REMOTE_USER}@${REMOTE_IP}" "docker load"
 echo "正在上传前端镜像 ($WEB_IMAGE)..."
-docker save \"$WEB_IMAGE\" | ssh -o \"StrictHostKeyChecking no\" -o \"UserKnownHostsFile /dev/null\" \"${REMOTE_USER}@${REMOTE_IP}\" \"docker load\"
+docker save $WEB_IMAGE | ssh -o "StrictHostKeyChecking no" -o "UserKnownHostsFile /dev/null" "${REMOTE_USER}@${REMOTE_IP}" "docker load"
 echo "镜像上传并加载完成。"
 
 echo -e "${CYAN}\n>>> 第四步：在服务器上重启应用服务...${NC}"
