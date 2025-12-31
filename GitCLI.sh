@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 
 # ======================================================
-# GitCLI.sh - v3.0 (极致顺滑版)
-# 优化：智能提交后默认回车即推送 (Enter = Yes)
-# 结构：清爽菜单 + 目录浏览 + 自动Stash + DeepSeek
+# GitCLI.sh - v3.1 (修复版)
+# 修复：
+# 1. Live Diff 中文件名被截断 (itCLI.sh -> GitCLI.sh)
+# 2. 主菜单 UI 图标对齐问题
 # ======================================================
 
 set -u
@@ -63,7 +64,7 @@ get_status_header() {
     
     local line1=$(printf "${C_INFO} 🌿 分支: ${C_SUCCESS}%-15s${C_RESET} ${C_INFO}同步: ${C_WARN}↑%s ↓%s${C_RESET} ${C_INFO} 项目: ${C_SUCCESS}%s${C_RESET}" \
                  "$branch" "${ahead:-0}" "${behind:-0}" "$repo")
-                 
+                  
     local line2=$(printf "${C_INFO} 📊 状态: ${C_SUCCESS}新增:%s ${C_WARN}修改:%s ${C_ERROR}删除:%s ${C_INFO}未跟踪:%s${C_RESET}" \
                  "${added:-0}" "${modified:-0}" "${deleted:-0}" "${untracked:-0}")
     
@@ -124,13 +125,25 @@ smart_commit_and_push() {
          read -r ans; [[ "$ans" == "y" ]] && git stash pop
     fi
 
-    # 2. 选择文件
-    local files=$(git status --porcelain | fzf -m --ansi --prompt="选择文件 (Tab多选) > " \
-        --preview="echo {} | awk '{print \$2}' | xargs git diff --color=always")
+    # 2. 选择文件 (修复中文乱码 & 支持带空格的文件名)
+    local files=$(git -c core.quotePath=false status --porcelain -uall | fzf -m --ansi --prompt="选择文件 (Tab多选) > " \
+        --preview="stat=\$(echo {} | awk '{print \$1}'); \
+                   # 提取文件名，处理可能存在的空格
+                   file=\$(echo {} | awk '{\$1=\"\"; print \$0}' | sed 's/^[ \t]*//'); \
+                   if [[ \"\$stat\" == '??' ]]; then \
+                       if command -v bat >/dev/null; then bat --color=always --style=numbers \"\$file\"; else cat \"\$file\"; fi; \
+                   else \
+                       git diff --color=always -- \"\$file\"; \
+                   fi")
+                   
     [[ -z "$files" ]] && return
-    echo "$files" | awk '{print $2}' | xargs git add
+    
+    # 3. 提交选中的文件
+    echo "$files" | awk '{$1=""; print $0}' | sed 's/^[ \t]*//' | while read -r file; do
+        git add "$file"
+    done
 
-    # 3. 生成 Message
+    # 4. 生成 Message
     local mode=$(printf "✨ AI 生成 (DeepSeek)\n📝 手动输入\n🔙 取消" | fzf --prompt="Commit Message > ")
     local msg=""
     
@@ -145,16 +158,14 @@ smart_commit_and_push() {
         *) git reset; return ;;
     esac
 
-    # 4. 提交并默认推送
+    # 5. 提交并默认推送
     if [[ -n "$msg" ]]; then
         if git commit -m "$msg"; then
             echo -e "${C_SUCCESS}🎉 本地提交成功！${C_RESET}"
             echo ""
-            # 重点修改：默认 Yes，提示符改为 [Y/n]
             echo -e "${C_WARN}🚀 是否立即推送到远程？ [Y/n] (默认: Yes)${C_RESET}"
             read -r push_ans
             
-            # 如果输入为空，默认为 Y
             [[ -z "$push_ans" ]] && push_ans="Y"
             
             if [[ "$push_ans" =~ ^[Yy] ]]; then
@@ -202,7 +213,154 @@ file_history_explorer() {
 }
 
 # ----------------------------
-# 6. 推送功能组
+# 6. 实时变更对比 (Live Diff) - 修复截断问题
+# ----------------------------
+live_diff_viewer() {
+    # 1. 检查是否有变更
+    if [[ -z "$(git status --porcelain)" ]]; then
+        echo -e "${C_SUCCESS}✨ 工作区很干净，没有任何变更。${C_RESET}"
+        read -n 1 -s -r
+        return
+    fi
+
+    # 2. 构建带颜色的文件列表
+    # 修复点：添加 IFS= 防止 read 命令吞掉行首的空格，导致文件名首字母丢失
+    local file_list=$(git -c core.quotePath=false status --porcelain -uall | while IFS= read -r line; do
+        local stat_code="${line:0:2}"
+        local file_path="${line:3}"
+        
+        # 定义颜色
+        local color=""
+        local label=""
+        
+        case "$stat_code" in
+            "??") color=$'\e[32m'; label="[NEW] " ;;  # 绿色
+            " M"|"M "|'MM') color=$'\e[34m'; label="[MOD] " ;;  # 蓝色
+            " D"|"D ") color=$'\e[31m'; label="[DEL] " ;;  # 红色
+            *)         color=$'\e[33m'; label="[UNK] " ;;  # 黄色
+        esac
+        
+        # 输出: 颜色+标签+重置+文件名
+        echo "${color}${label}${C_RESET}${file_path}"
+    done)
+
+    # 3. 启动 FZF 预览界面
+    local sel=$(echo -e "$file_list" | fzf --ansi --layout=reverse --height=100% \
+        --prompt="👁️  变更审计 (Enter编辑) > " \
+        --header="↑↓选择 | 预览窗查看Diff | Enter打开文件" \
+        --preview="raw={}; label=\$(echo \$raw | awk '{print \$1}'); file=\$(echo \$raw | sed 's/^.*] //'); \
+                   if [[ \"\$label\" == *'[NEW]'* ]]; then \
+                       if command -v bat >/dev/null; then bat --color=always --style=numbers \"\$file\"; else cat \"\$file\"; fi; \
+                   elif [[ \"\$label\" == *'[DEL]'* ]]; then \
+                       echo '❌ 文件已删除 (显示最后版本):'; git show HEAD:\"\$file\" 2>/dev/null; \
+                   else \
+                       git diff --color=always -- \"\$file\"; \
+                   fi" \
+        --bind "enter:execute(file=\$(echo {} | sed 's/^.*] //'); ${EDITOR:-vim} \"\$file\" < /dev/tty > /dev/tty)" \
+    )
+}
+
+# ----------------------------
+# 7. 远程文件注射 (高级版)
+# ----------------------------
+inject_file_to_remote() {
+    echo -e "${C_INFO}📡 正在获取最新远程分支信息...${C_RESET}"
+    git fetch -q --all --prune
+
+    local target_remote=$(git branch -r | grep -v '\->' | sed 's/origin\///' | sed 's/^[ \t]*//' | \
+        fzf --prompt="🎯 选择目标远程分支 (本地可能没有) > " --height=40% --layout=reverse)
+    
+    [[ -z "$target_remote" ]] && return
+
+    echo -e "${C_INFO}🔍 正在对比差异并分组 (Local vs origin/$target_remote)...${C_RESET}"
+
+    local BG_BLUE=$'\e[44;97m'
+    local BG_GREEN=$'\e[42;97m'
+    local BG_RESET=$'\e[0m'
+
+    local display_list=""
+
+    local diff_files=$(git diff --name-only "origin/$target_remote" 2>/dev/null)
+    if [[ -n "$diff_files" ]]; then
+        while read -r f; do
+            if [[ -f "$f" ]]; then
+                display_list+="${BG_BLUE} MODIFIED ${BG_RESET} $f\n"
+            fi
+        done <<< "$diff_files"
+    fi
+
+    local new_files=$(git ls-files --others --exclude-standard)
+    if [[ -n "$new_files" ]]; then
+        while read -r f; do
+             display_list+="${BG_GREEN} NEW FILE ${BG_RESET} $f\n"
+        done <<< "$new_files"
+    fi
+    
+    if [[ -z "$display_list" || "$display_list" == $'\n' ]]; then
+        echo -e "${C_WARN}没有检测到任何差异或新文件。${C_RESET}"
+        return
+    fi
+
+    local selection=$(echo -e "$display_list" | fzf -m --ansi --no-sort \
+        --prompt="💉 选择要注入的文件 (Tab多选) > " \
+        --preview="file=\$(echo {} | sed 's/^.*] //; s/^.* //'); \
+                   if command -v bat >/dev/null; then bat --color=always --style=numbers \"\$file\"; else cat \"\$file\"; fi")
+
+    [[ -z "$selection" ]] && return
+
+    local clean_files=$(echo "$selection" | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
+
+    echo -e "${C_WARN}⚠️  即将执行高危操作：${C_RESET}"
+    echo -e "   将把本地文件注入到远程: ${C_SUCCESS}origin/$target_remote${C_RESET}"
+    read -p "确认继续? (y/N) " confirm
+    [[ "$confirm" != "y" && "$confirm" != "Y" ]] && return
+
+    local current_branch=$(git rev-parse --abbrev-ref HEAD)
+    local temp_branch="cli-inject-tmp-$(date +%s)"
+    local payload_tar="/tmp/git_inject_payload.tar"
+
+    echo "$clean_files" | tr '\n' '\0' | xargs -0 tar -cf "$payload_tar"
+
+    local stashed=0
+    if has_uncommitted; then
+        echo -e "${C_INFO}暂存当前工作区...${C_RESET}"
+        git stash push -u -m "Auto stash by Injector" >/dev/null
+        stashed=1
+    fi
+
+    if ! git checkout -b "$temp_branch" "origin/$target_remote" 2>/dev/null; then
+        echo -e "${C_ERROR}❌ 无法检出远程分支。${C_RESET}"
+        rm "$payload_tar"
+        [[ "$stashed" -eq 1 ]] && git stash pop
+        return
+    fi
+
+    tar -xf "$payload_tar"
+    rm "$payload_tar"
+
+    git add .
+    if git commit -m "chore(inject): inject files from $current_branch"; then
+        echo -e "${C_INFO}🚀 推送到远程...${C_RESET}"
+        git push origin HEAD:"$target_remote"
+        echo -e "${C_SUCCESS}✅ 注入成功！${C_RESET}"
+    else
+        echo -e "${C_WARN}无变化，跳过推送。${C_RESET}"
+    fi
+
+    git checkout "$current_branch" >/dev/null 2>&1
+    git branch -D "$temp_branch" >/dev/null 2>&1
+
+    if [[ "$stashed" -eq 1 ]]; then
+        echo -e "${C_INFO}恢复工作区...${C_RESET}"
+        git stash pop >/dev/null 2>&1
+    fi
+    
+    echo -e "${C_INFO}按任意键返回...${C_RESET}"
+    read -n 1 -s -r
+}
+
+# ----------------------------
+# 8. 推送功能组
 # ----------------------------
 smart_force_push() {
     local action=$(printf "👉 当前分支\n🔀 其他分支" | fzf --prompt="推送到哪里? > ")
@@ -225,14 +383,14 @@ push_backup_branch() {
     local timestamp=$(date '+%Y%m%d-%H%M')
     local default="backup/$current_branch/$timestamp"
     
-    echo -e "${C_INFO}创建一个远程备份分支 (不影响当前本地工作区)${C_RESET}"
+    echo -e "${C_INFO}创建一个远程备份分支${C_RESET}"
     echo -e "输入新分支名 (回车默认: ${C_SUCCESS}$default${C_RESET}):"
     read -r name
     [[ -z "$name" ]] && name="$default"
     
     echo -e "${C_INFO}⏳ 正在推送 HEAD 到 origin/$name ...${C_RESET}"
     if git push origin HEAD:"$name"; then
-        echo -e "${C_SUCCESS}✅ 备份完成！远程分支已创建：$name${C_RESET}"
+        echo -e "${C_SUCCESS}✅ 备份完成！${C_RESET}"
     else
         echo -e "${C_ERROR}❌ 备份失败${C_RESET}"
     fi
@@ -257,7 +415,7 @@ show_push_menu() {
 }
 
 # ----------------------------
-# 7. 其他逻辑
+# 9. 其他逻辑
 # ----------------------------
 switch_branch_safe() {
     local target=$(git branch --format='%(refname:short)' | fzf --prompt="切换分支 > " --preview="git log --oneline --graph --color=always {} | head -20")
@@ -285,42 +443,82 @@ sync_specific_files() {
     echo -e "${C_SUCCESS}同步完成${C_RESET}"
 }
 
+
 # ----------------------------
-# 8. 主菜单 Loop
+# 10. 主菜单 Loop (Refresh 置顶版)
 # ----------------------------
 main_menu() {
     while true; do
         clear 
         local header_content=$(get_status_header)
+        local SEP="─────────────────────────────"
         
-        # 将 "智能提交" 改名为 "智能提交 & 推送"，更符合逻辑
-        local choice=$(printf "🔄 刷新状态\n📥 拉取代码 (Pull)\n🚀 智能提交 & 推送 (Smart Commit & Push)\n📤 推送菜单 (Push Options)\n🌿 切换分支 (Checkout)\n🔍 文件审计 (Explorer)\n🍒 定向同步 (Sync Files)\n📜 查看日志 (Log)\n📂 结构迁移 (Migrate)\n❌ 退出" | \
-            fzf --ansi --layout=reverse --border=rounded --margin=1 --header-first \
-                --height=100% --prompt="✨ GitCLI > " --header="$header_content")
+        # 定义菜单项
+        local item_refresh="🔄  刷新状态 (Refresh)"  # <--- 移到这里定义，方便置顶
+        
+        # 1. 核心开发
+        local item_commit="🚀  智能提交 & 推送 (Smart Commit)"
+        local item_pull="📥  拉取代码 (Pull)"
+        local item_push="📤  推送选项 (Push Options)"
+        
+        # 2. 浏览与审计
+        local item_livediff="👁️   实时变更对比 (Live Diff)" 
+        local item_checkout="🌿  切换分支 (Checkout)"
+        local item_log="📜  查看日志 (Log)"
+        local item_explore="🔍  文件审计 (Explorer)"
+        
+        # 3. 高级工具
+        local item_inject="💉  远程文件注射 (Inject to Remote)"
+        local item_sync="🍒  本地定向同步 (Sync Files)"
+        local item_migrate="📂  结构迁移 (Migrate)"
+        
+        # 4. 系统
+        local item_exit="❌  退出 (Exit)"
 
-        [[ -z "$choice" ]] && choice="🔄 刷新状态"
+        # 组装顺序：刷新 -> 核心 -> 浏览 -> 高级 -> 退出
+        local choice=$(printf "%s\n%s\n%s\n%s\n  %s\n%s\n%s\n%s\n%s\n  %s\n%s\n%s\n%s\n  %s\n%s" \
+            "$item_refresh" \
+            "$item_commit" \
+            "$item_pull" \
+            "$item_push" \
+            "${C_MENU}$SEP${C_RESET}" \
+            "$item_livediff" \
+            "$item_checkout" \
+            "$item_log" \
+            "$item_explore" \
+            "${C_MENU}$SEP${C_RESET}" \
+            "$item_inject" \
+            "$item_sync" \
+            "$item_migrate" \
+            "${C_MENU}$SEP${C_RESET}" \
+            "$item_exit" | \
+            fzf --ansi --layout=reverse --border=rounded --margin=1 --header-first \
+                --height=100% --prompt="✨ GitCLI > " --header="$header_content" \
+                --pointer="▶" --marker="✓")
+
+        [[ -z "$choice" ]] && choice="$item_refresh"
 
         case "$choice" in
-            *"刷新"*) continue ;;
-            *"拉取"*) git pull ;;
+            *"刷新状态"*) continue ;;  # <--- 逻辑已置顶
             *"智能提交"*) smart_commit_and_push ;;
-            *"推送菜单"*) show_push_menu ;; 
+            *"拉取代码"*) git pull ;;
+            *"推送选项"*) show_push_menu ;;
+            *"实时变更对比"*) live_diff_viewer ;; 
             *"切换分支"*) switch_branch_safe ;;
-            *"文件审计"*) file_history_explorer ;;
-            *"定向同步"*) sync_specific_files ;;
             *"查看日志"*) git log --oneline --graph --all --color=always | fzf --ansi --preview="echo {} | grep -o '[a-f0-9]\{7\}' | head -1 | xargs -I % git show --color=always %" ;;
-            *"结构迁移"*) 
-                git add -A && git commit -m "refactor: structural migration" && echo "本地已提交" 
-                ;;
+            *"文件审计"*) file_history_explorer ;;
+            *"远程文件注射"*) inject_file_to_remote ;;
+            *"本地定向同步"*) sync_specific_files ;;
+            *"结构迁移"*) git add -A && git commit -m "refactor: structural migration" && echo "本地已提交" ;;
             *"退出"*) exit 0 ;;
+            *SEP*) continue ;;
         esac
 
-        if [[ "$choice" != *"刷新"* && "$choice" != *"推送菜单"* ]]; then
+        if [[ "$choice" != *"刷新"* && "$choice" != *"推送选项"* && "$choice" != *"SEP"* ]]; then
             echo -e "\n${C_INFO}按任意键继续...${C_RESET}"
             read -n 1 -s -r
         fi
     done
 }
-
 # 启动
 main_menu
