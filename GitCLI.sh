@@ -301,6 +301,129 @@ sync_specific_files() {
 }
 
 # ----------------------------
+# 新增: 远程文件注射 (高级版：带颜色分组)
+# ----------------------------
+inject_file_to_remote() {
+    # 0. 预备工作
+    echo -e "${C_INFO}📡 正在获取最新远程分支信息...${C_RESET}"
+    git fetch -q --all --prune
+
+    # 1. 选择目标远程分支
+    local target_remote=$(git branch -r | grep -v '\->' | sed 's/origin\///' | sed 's/^[ \t]*//' | \
+        fzf --prompt="🎯 选择目标远程分支 (本地可能没有) > " --height=40% --layout=reverse)
+    
+    [[ -z "$target_remote" ]] && return
+
+    echo -e "${C_INFO}🔍 正在对比差异并分组 (Local vs origin/$target_remote)...${C_RESET}"
+
+    # 定义 ANSI 背景色
+    local BG_BLUE=$'\e[44;97m'   # 蓝底白字
+    local BG_GREEN=$'\e[42;97m'  # 绿底白字
+    local BG_RESET=$'\e[0m'
+
+    # 2. 构建分组列表
+    # -----------------------------------------------------
+    local display_list=""
+
+    # A. [修改组] 获取差异文件 (并确保本地存在)
+    local diff_files=$(git diff --name-only "origin/$target_remote" 2>/dev/null)
+    if [[ -n "$diff_files" ]]; then
+        # 逐行处理，只添加本地存在的文件
+        while read -r f; do
+            if [[ -f "$f" ]]; then
+                display_list+="${BG_BLUE} MODIFIED ${BG_RESET} $f\n"
+            fi
+        done <<< "$diff_files"
+    fi
+
+    # B. [新增组] 获取未跟踪文件
+    local new_files=$(git ls-files --others --exclude-standard)
+    if [[ -n "$new_files" ]]; then
+        while read -r f; do
+             display_list+="${BG_GREEN} NEW FILE ${BG_RESET} $f\n"
+        done <<< "$new_files"
+    fi
+    
+    # 如果列表为空
+    if [[ -z "$display_list" || "$display_list" == $'\n' ]]; then
+        echo -e "${C_WARN}没有检测到任何差异或新文件。${C_RESET}"
+        return
+    fi
+
+    # C. 调用 FZF
+    # --ansi: 解析颜色代码
+    # --no-sort: 保持我们可以构建的 [修改] 在前 [新增] 在后的顺序
+    local selection=$(echo -e "$display_list" | fzf -m --ansi --no-sort \
+        --prompt="💉 选择要注入的文件 (Tab多选) > " \
+        --preview="file=\$(echo {} | sed 's/^.*] //; s/^.* //'); \
+                   if command -v bat >/dev/null; then bat --color=always --style=numbers \"\$file\"; else cat \"\$file\"; fi")
+
+    [[ -z "$selection" ]] && return
+
+    # D. 清洗选中结果（去掉颜色标签，只提取文件名）
+    # 逻辑：去掉每一行的第一个字段（标签），然后去除前导空格
+    local clean_files=$(echo "$selection" | awk '{$1=""; print $0}' | sed 's/^[ \t]*//')
+
+    # 3. 确认操作
+    echo -e "${C_WARN}⚠️  即将执行高危操作：${C_RESET}"
+    echo -e "   将把本地文件注入到远程: ${C_SUCCESS}origin/$target_remote${C_RESET}"
+    echo -e "   这会产生一个新的 Commit 并直接推送。"
+    read -p "确认继续? (y/N) " confirm
+    [[ "$confirm" != "y" && "$confirm" != "Y" ]] && return
+
+    # 4. 开始执行环境切换
+    local current_branch=$(git rev-parse --abbrev-ref HEAD)
+    local temp_branch="cli-inject-tmp-$(date +%s)"
+    local payload_tar="/tmp/git_inject_payload.tar"
+
+    # A. 打包 (使用清洗后的文件名)
+    echo "$clean_files" | tr '\n' '\0' | xargs -0 tar -cf "$payload_tar"
+
+    # B. 处理当前工作区
+    local stashed=0
+    if has_uncommitted; then
+        echo -e "${C_INFO}暂存当前工作区...${C_RESET}"
+        git stash push -u -m "Auto stash by Injector" >/dev/null
+        stashed=1
+    fi
+
+    # C. 基于远程分支创建临时分支
+    if ! git checkout -b "$temp_branch" "origin/$target_remote" 2>/dev/null; then
+        echo -e "${C_ERROR}❌ 无法检出远程分支，可能该分支不存在或权限不足。${C_RESET}"
+        rm "$payload_tar"
+        [[ "$stashed" -eq 1 ]] && git stash pop
+        return
+    fi
+
+    # D. 解包覆盖
+    tar -xf "$payload_tar"
+    rm "$payload_tar"
+
+    # E. 提交并推送
+    git add .
+    if git commit -m "chore(inject): inject files from $current_branch"; then
+        echo -e "${C_INFO}🚀 推送到远程...${C_RESET}"
+        git push origin HEAD:"$target_remote"
+        echo -e "${C_SUCCESS}✅ 注入成功！${C_RESET}"
+    else
+        echo -e "${C_WARN}没有检测到文件变化，跳过推送。${C_RESET}"
+    fi
+
+    # F. 清理现场
+    git checkout "$current_branch" >/dev/null 2>&1
+    git branch -D "$temp_branch" >/dev/null 2>&1
+
+    # G. 恢复 Stash
+    if [[ "$stashed" -eq 1 ]]; then
+        echo -e "${C_INFO}恢复工作区...${C_RESET}"
+        git stash pop >/dev/null 2>&1
+    fi
+    
+    echo -e "${C_INFO}按任意键返回...${C_RESET}"
+    read -n 1 -s -r
+}
+
+# ----------------------------
 # 8. 主菜单 Loop
 # ----------------------------
 main_menu() {
@@ -308,8 +431,8 @@ main_menu() {
         clear 
         local header_content=$(get_status_header)
         
-        # 将 "智能提交" 改名为 "智能提交 & 推送"，更符合逻辑
-        local choice=$(printf "🔄 刷新状态\n📥 拉取代码 (Pull)\n🚀 智能提交 & 推送 (Smart Commit & Push)\n📤 推送菜单 (Push Options)\n🌿 切换分支 (Checkout)\n🔍 文件审计 (Explorer)\n🍒 定向同步 (Sync Files)\n📜 查看日志 (Log)\n📂 结构迁移 (Migrate)\n❌ 退出" | \
+        # 在这里加入 "💉 远程注射"
+        local choice=$(printf "🔄 刷新状态\n📥 拉取代码 (Pull)\n🚀 智能提交 & 推送 (Smart Commit & Push)\n💉 远程注射 (Inject to Remote)\n📤 推送菜单 (Push Options)\n🌿 切换分支 (Checkout)\n🔍 文件审计 (Explorer)\n🍒 定向同步 (Sync Files)\n📜 查看日志 (Log)\n📂 结构迁移 (Migrate)\n❌ 退出" | \
             fzf --ansi --layout=reverse --border=rounded --margin=1 --header-first \
                 --height=100% --prompt="✨ GitCLI > " --header="$header_content")
 
@@ -319,6 +442,7 @@ main_menu() {
             *"刷新"*) continue ;;
             *"拉取"*) git pull ;;
             *"智能提交"*) smart_commit_and_push ;;
+            *"远程注射"*) inject_file_to_remote ;;  # <--- 绑定新函数
             *"推送菜单"*) show_push_menu ;; 
             *"切换分支"*) switch_branch_safe ;;
             *"文件审计"*) file_history_explorer ;;
@@ -330,12 +454,11 @@ main_menu() {
             *"退出"*) exit 0 ;;
         esac
 
-        if [[ "$choice" != *"刷新"* && "$choice" != *"推送菜单"* ]]; then
+        if [[ "$choice" != *"刷新"* && "$choice" != *"推送菜单"* && "$choice" != *"远程注射"* ]]; then
             echo -e "\n${C_INFO}按任意键继续...${C_RESET}"
             read -n 1 -s -r
         fi
     done
 }
-
 # 启动
 main_menu
