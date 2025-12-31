@@ -4,6 +4,13 @@
 # 如果任何命令失败，则立即退出
 set -e
 
+echo ">>> 0. 解压部署包..."
+# 从 deploy_package.tar.gz 中解压出其他文件 (Step1 只解压了脚本本身)
+tar -zxvf deploy_package.tar.gz server_image.tar web_image.tar project.tar.gz
+
+echo ">>> 0.1 解压项目源码..."
+tar -zxvf project.tar.gz
+
 echo ">>> 1. 加载Docker镜像..."
 docker load -i server_image.tar || { echo "加载 server_image.tar 失败"; exit 1; }
 docker load -i web_image.tar || { echo "加载 web_image.tar 失败"; exit 1; }

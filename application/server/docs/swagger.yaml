@@ -1,0 +1,315 @@
+basePath: /api
+definitions:
+  api.CreateOrderRequest:
+    type: object
+  api.PickupGoodsRequest:
+    properties:
+      orderId:
+        example: ORDER_2024_001
+        type: string
+      shipmentId:
+        example: SHIPMENT_2024_001
+        type: string
+    type: object
+  api.UpdateLocationRequest:
+    properties:
+      location:
+        example: SHANGHAI_PORT
+        type: string
+    type: object
+  api.UpdateStatusRequest:
+    properties:
+      status:
+        example: PRODUCING
+        type: string
+    type: object
+  utils.Response:
+    properties:
+      code:
+        type: integer
+      data: {}
+      message:
+        type: string
+    type: object
+host: 192.168.1.41:8080
+info:
+  contact: {}
+  description: 基于 Hyperledger Fabric 的汽配供应链协同系统 API 文档
+  title: 供应链协同系统 API 文档
+  version: "1.0"
+paths:
+  /api/carrier/shipment/{id}:
+    get:
+      consumes:
+      - application/json
+      description: 查询物流单的详细信息
+      parameters:
+      - description: 物流单ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.Response'
+      summary: 查询物流详情
+      tags:
+      - Carrier
+  /api/carrier/shipment/{id}/history:
+    get:
+      consumes:
+      - application/json
+      description: 查询物流单的完整位置变更历史
+      parameters:
+      - description: 物流单ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.Response'
+      summary: 查询物流单历史记录
+      tags:
+      - Carrier
+  /api/carrier/shipment/{id}/location:
+    put:
+      consumes:
+      - application/json
+      description: Carrier 更新物流单的位置信息
+      parameters:
+      - description: 物流单ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 位置信息
+        in: body
+        name: location
+        required: true
+        schema:
+          $ref: '#/definitions/api.UpdateLocationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.Response'
+      summary: 更新物流位置
+      tags:
+      - Carrier
+  /api/carrier/shipment/pickup:
+    post:
+      consumes:
+      - application/json
+      description: Carrier 取货并生成物流单，订单状态变为 READY
+      parameters:
+      - description: 取货信息
+        in: body
+        name: data
+        required: true
+        schema:
+          $ref: '#/definitions/api.PickupGoodsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.Response'
+      summary: 承运商取货
+      tags:
+      - Carrier
+  /api/manufacturer/order/{id}/accept:
+    put:
+      consumes:
+      - application/json
+      description: Manufacturer 接受 OEM 创建的订单，状态变为 ACCEPTED
+      parameters:
+      - description: 订单ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.Response'
+      summary: 零部件厂商接受订单
+      tags:
+      - Manufacturer
+  /api/manufacturer/order/{id}/status:
+    put:
+      consumes:
+      - application/json
+      description: Manufacturer 更新订单的生产状态 (PRODUCING/PRODUCED/READY)
+      parameters:
+      - description: 订单ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 新状态
+        in: body
+        name: status
+        required: true
+        schema:
+          $ref: '#/definitions/api.UpdateStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.Response'
+      summary: 更新生产状态
+      tags:
+      - Manufacturer
+  /api/oem/order/{id}:
+    get:
+      consumes:
+      - application/json
+      description: 根据订单ID查询订单详细信息
+      parameters:
+      - description: 订单ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.Response'
+      summary: 查询订单详情
+      tags:
+      - OEM
+  /api/oem/order/{id}/history:
+    get:
+      consumes:
+      - application/json
+      description: 查询订单的完整状态变更历史，展示区块链不可篡改的审计追踪
+      parameters:
+      - description: 订单ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.Response'
+      summary: 查询订单历史记录
+      tags:
+      - OEM
+  /api/oem/order/{id}/receive:
+    put:
+      consumes:
+      - application/json
+      description: OEM 确认收货，订单状态变为 RECEIVED
+      parameters:
+      - description: 订单ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.Response'
+      summary: OEM 确认收货
+      tags:
+      - OEM
+  /api/oem/order/create:
+    post:
+      consumes:
+      - application/json
+      description: OEM 创建新的采购订单，订单状态为 CREATED
+      parameters:
+      - description: 订单信息
+        in: body
+        name: order
+        required: true
+        schema:
+          $ref: '#/definitions/api.CreateOrderRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.Response'
+      summary: 主机厂创建采购订单
+      tags:
+      - OEM
+  /api/oem/order/list:
+    get:
+      consumes:
+      - application/json
+      description: 分页查询订单列表，支持根据角色过滤
+      parameters:
+      - default: 10
+        description: 每页数量
+        in: query
+        name: pageSize
+        type: integer
+      - description: 分页书签
+        in: query
+        name: bookmark
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.Response'
+      summary: 查询订单列表
+      tags:
+      - OEM
+  /api/platform/all:
+    get:
+      consumes:
+      - application/json
+      description: 查询账本上所有资产（订单和物流单）的当前状态及其完整的历史变更记录，用于审计和追溯
+      parameters:
+      - default: 10
+        description: 每页数量
+        in: query
+        name: pageSize
+        type: integer
+      - description: 分页书签
+        in: query
+        name: bookmark
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.Response'
+      summary: 查询所有账本数据及完整历史变更记录
+      tags:
+      - Platform
+swagger: "2.0"

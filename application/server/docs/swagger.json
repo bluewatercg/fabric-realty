@@ -1,0 +1,479 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "基于 Hyperledger Fabric 的汽配供应链协同系统 API 文档",
+        "title": "供应链协同系统 API 文档",
+        "contact": {},
+        "version": "1.0"
+    },
+    "host": "192.168.1.41:8080",
+    "basePath": "/api",
+    "paths": {
+        "/api/carrier/shipment/pickup": {
+            "post": {
+                "description": "Carrier 取货并生成物流单，订单状态变为 READY",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Carrier"
+                ],
+                "summary": "承运商取货",
+                "parameters": [
+                    {
+                        "description": "取货信息",
+                        "name": "data",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.PickupGoodsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/carrier/shipment/{id}": {
+            "get": {
+                "description": "查询物流单的详细信息",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Carrier"
+                ],
+                "summary": "查询物流详情",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "物流单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/carrier/shipment/{id}/history": {
+            "get": {
+                "description": "查询物流单的完整位置变更历史",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Carrier"
+                ],
+                "summary": "查询物流单历史记录",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "物流单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/carrier/shipment/{id}/location": {
+            "put": {
+                "description": "Carrier 更新物流单的位置信息",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Carrier"
+                ],
+                "summary": "更新物流位置",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "物流单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "位置信息",
+                        "name": "location",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.UpdateLocationRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/manufacturer/order/{id}/accept": {
+            "put": {
+                "description": "Manufacturer 接受 OEM 创建的订单，状态变为 ACCEPTED",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Manufacturer"
+                ],
+                "summary": "零部件厂商接受订单",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "订单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/manufacturer/order/{id}/status": {
+            "put": {
+                "description": "Manufacturer 更新订单的生产状态 (PRODUCING/PRODUCED/READY)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Manufacturer"
+                ],
+                "summary": "更新生产状态",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "订单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "新状态",
+                        "name": "status",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.UpdateStatusRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/oem/order/create": {
+            "post": {
+                "description": "OEM 创建新的采购订单，订单状态为 CREATED",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "OEM"
+                ],
+                "summary": "主机厂创建采购订单",
+                "parameters": [
+                    {
+                        "description": "订单信息",
+                        "name": "order",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.CreateOrderRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/oem/order/list": {
+            "get": {
+                "description": "分页查询订单列表，支持根据角色过滤",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "OEM"
+                ],
+                "summary": "查询订单列表",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "每页数量",
+                        "name": "pageSize",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "分页书签",
+                        "name": "bookmark",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/oem/order/{id}": {
+            "get": {
+                "description": "根据订单ID查询订单详细信息",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "OEM"
+                ],
+                "summary": "查询订单详情",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "订单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/oem/order/{id}/history": {
+            "get": {
+                "description": "查询订单的完整状态变更历史，展示区块链不可篡改的审计追踪",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "OEM"
+                ],
+                "summary": "查询订单历史记录",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "订单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/oem/order/{id}/receive": {
+            "put": {
+                "description": "OEM 确认收货，订单状态变为 RECEIVED",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "OEM"
+                ],
+                "summary": "OEM 确认收货",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "订单ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/platform/all": {
+            "get": {
+                "description": "查询账本上所有资产（订单和物流单）的当前状态及其完整的历史变更记录，用于审计和追溯",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Platform"
+                ],
+                "summary": "查询所有账本数据及完整历史变更记录",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "每页数量",
+                        "name": "pageSize",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "分页书签",
+                        "name": "bookmark",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "api.CreateOrderRequest": {
+            "type": "object"
+        },
+        "api.PickupGoodsRequest": {
+            "type": "object",
+            "properties": {
+                "orderId": {
+                    "type": "string",
+                    "example": "ORDER_2024_001"
+                },
+                "shipmentId": {
+                    "type": "string",
+                    "example": "SHIPMENT_2024_001"
+                }
+            }
+        },
+        "api.UpdateLocationRequest": {
+            "type": "object",
+            "properties": {
+                "location": {
+                    "type": "string",
+                    "example": "SHANGHAI_PORT"
+                }
+            }
+        },
+        "api.UpdateStatusRequest": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "example": "PRODUCING"
+                }
+            }
+        },
+        "utils.Response": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "data": {},
+                "message": {
+                    "type": "string"
+                }
+            }
+        }
+    }
+}

@@ -127,14 +127,15 @@ else
 fi
 
 # 5. 重启应用服务
+# 5. 重启应用服务
 echo "--> [5/5] 重启应用服务..."
-if [ -f "application/docker-compose.yaml" ]; then
+if [ -f "application/docker-compose.yml" ]; then
     # 强制重新创建容器
-    docker-compose -f application/docker-compose.yaml down
-    docker-compose -f application/docker-compose.yaml up -d
+    docker-compose -f application/docker-compose.yml down
+    docker-compose -f application/docker-compose.yml up -d
     echo "应用服务已启动"
 else
-    echo "警告：找不到 application/docker-compose.yaml"
+    echo "警告：找不到 application/docker-compose.yml"
 fi
 
 # 清理临时文件

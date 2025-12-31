@@ -18,6 +18,12 @@ func NewSupplyChainHandler() *SupplyChainHandler {
 	}
 }
 
+type CreateOrderRequest struct {
+	ID             string      `json:"id" example:"ORDER_2024_001"`
+	ManufacturerID string      `json:"manufacturerId" example:"MANUFACTURER_A"`
+	Items          interface{} `json:"items" example:"[{\"name\":\"engine_part_xyz\",\"quantity\":100}]"`
+}
+
 // CreateOrder 主机厂发布订单
 // @Summary 主机厂创建采购订单
 // @Description OEM 创建新的采购订单，订单状态为 CREATED
@@ -28,11 +34,7 @@ func NewSupplyChainHandler() *SupplyChainHandler {
 // @Success 200 {object} utils.Response
 // @Router /api/oem/order/create [post]
 func (h *SupplyChainHandler) CreateOrder(c *gin.Context) {
-	var req struct {
-		ID             string      `json:"id"`
-		ManufacturerID string      `json:"manufacturerId"`
-		Items          interface{} `json:"items"`
-	}
+	var req CreateOrderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.BadRequest(c, "无效的请求参数")
 		return
@@ -66,6 +68,10 @@ func (h *SupplyChainHandler) AcceptOrder(c *gin.Context) {
 	utils.SuccessWithMessage(c, "订单已接受", nil)
 }
 
+type UpdateStatusRequest struct {
+	Status string `json:"status" example:"PRODUCING"`
+}
+
 // UpdateStatus 更新状态
 // @Summary 更新生产状态
 // @Description Manufacturer 更新订单的生产状态 (PRODUCING/PRODUCED/READY)
@@ -78,9 +84,7 @@ func (h *SupplyChainHandler) AcceptOrder(c *gin.Context) {
 // @Router /api/manufacturer/order/{id}/status [put]
 func (h *SupplyChainHandler) UpdateStatus(c *gin.Context) {
 	id := c.Param("id")
-	var req struct {
-		Status string `json:"status"`
-	}
+	var req UpdateStatusRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.BadRequest(c, "参数错误")
 		return
@@ -96,6 +100,11 @@ func (h *SupplyChainHandler) UpdateStatus(c *gin.Context) {
 	utils.SuccessWithMessage(c, "状态已更新", nil)
 }
 
+type PickupGoodsRequest struct {
+	OrderID    string `json:"orderId" example:"ORDER_2024_001"`
+	ShipmentID string `json:"shipmentId" example:"SHIPMENT_2024_001"`
+}
+
 // PickupGoods 承运商取货
 // @Summary 承运商取货
 // @Description Carrier 取货并生成物流单，订单状态变为 READY
@@ -106,10 +115,7 @@ func (h *SupplyChainHandler) UpdateStatus(c *gin.Context) {
 // @Success 200 {object} utils.Response
 // @Router /api/carrier/shipment/pickup [post]
 func (h *SupplyChainHandler) PickupGoods(c *gin.Context) {
-	var req struct {
-		OrderID    string `json:"orderId"`
-		ShipmentID string `json:"shipmentId"`
-	}
+	var req PickupGoodsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.BadRequest(c, "参数错误")
 		return
@@ -120,6 +126,10 @@ func (h *SupplyChainHandler) PickupGoods(c *gin.Context) {
 		return
 	}
 	utils.SuccessWithMessage(c, "已取货并生成物流单", nil)
+}
+
+type UpdateLocationRequest struct {
+	Location string `json:"location" example:"SHANGHAI_PORT"`
 }
 
 // UpdateLocation 更新物流位置
@@ -134,9 +144,7 @@ func (h *SupplyChainHandler) PickupGoods(c *gin.Context) {
 // @Router /api/carrier/shipment/{id}/location [put]
 func (h *SupplyChainHandler) UpdateLocation(c *gin.Context) {
 	id := c.Param("id") // shipmentId
-	var req struct {
-		Location string `json:"location"`
-	}
+	var req UpdateLocationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		utils.BadRequest(c, "参数错误")
 		return

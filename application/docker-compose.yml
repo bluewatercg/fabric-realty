@@ -14,8 +14,9 @@ services:
       - /usr/share/zoneinfo/Asia/Shanghai:/usr/share/zoneinfo/Asia/Shanghai
       - ./../network/crypto-config:/network/crypto-config
       - ./../network/data/application:/app/data
+      - ./server/config/config-docker.yaml:/app/config/config.yaml
     ports:
-      - "8080:8080"
+      - "8080:8888"
     networks:
       - fabric_togettoyou_network
     environment:

@@ -15,7 +15,7 @@ import (
 // @title 供应链协同系统 API 文档
 // @version 1.0
 // @description 基于 Hyperledger Fabric 的汽配供应链协同系统 API 文档
-// @host localhost:8080
+// @host 192.168.1.41:8080
 // @BasePath /api
 
 func main() {
