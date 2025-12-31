@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"     // Corrected: import files and alias it
 	ginSwagger "github.com/swaggo/gin-swagger" // Corrected: import gin-swagger
+	_ "application/docs"
 )
 
 // @title 供应链协同系统 API 文档
