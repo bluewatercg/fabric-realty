@@ -1,0 +1,137 @@
+version: '2.1'
+
+networks:
+  fabric_togettoyou_network:
+    name: fabric_togettoyou_network
+    external: true
+
+services:
+  peer0.org2.togettoyou.com:
+    image: hyperledger/fabric-peer:2.5.10
+    container_name: peer0.org2.togettoyou.com
+    environment:
+      - FABRIC_LOGGING_SPEC=INFO
+      - CORE_PEER_PROFILE_ENABLED=false
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:7051
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+      - CORE_CHAINCODE_EXECUTETIMEOUT=300s
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=fabric_togettoyou_network
+      - CORE_PEER_GOSSIP_USELEADERELECTION=true
+      - CORE_PEER_GOSSIP_ORGLEADER=false
+      - CORE_LEDGER_STATE_STATEDATABASE=goleveldb
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/peer/msp
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/peer/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/peer/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/peer/tls/ca.crt
+      - CORE_PEER_ID=peer0.org2.togettoyou.com
+      - CORE_PEER_LOCALMSPID=Org2MSP
+      - CORE_PEER_ADDRESS=peer0.org2.togettoyou.com:7051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.org2.togettoyou.com:7052
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer1.org2.togettoyou.com:7051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.org2.togettoyou.com:7051
+    ports:
+      - "7051:7051"
+      - "7053:7053"
+    volumes:
+      - /var/run/docker.sock:/host/var/run/docker.sock
+      - ./crypto-config/peerOrganizations/org2.togettoyou.com/peers/peer0.org2.togettoyou.com:/etc/hyperledger/peer
+      - ./data/peer0.org2.togettoyou.com:/var/hyperledger/production
+      - ./config:/etc/hyperledger/config  # <--- 为 peer0 添加这一行
+      - ./crypto-config:/etc/hyperledger/crypto-config  # <--- 为 peer0 添加这一行
+      - ./configtx.yaml:/etc/hyperledger/configtx.yaml
+    networks:
+      - fabric_togettoyou_network
+    command: peer node start
+
+  peer1.org2.togettoyou.com:
+    image: hyperledger/fabric-peer:2.5.10
+    container_name: peer1.org2.togettoyou.com
+    environment:
+      - FABRIC_LOGGING_SPEC=INFO
+      - CORE_PEER_PROFILE_ENABLED=false
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:7051
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
+      - CORE_VM_ENDPOINT=unix:///host/var/run/docker.sock
+      - CORE_CHAINCODE_EXECUTETIMEOUT=300s
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=fabric_togettoyou_network
+      - CORE_PEER_GOSSIP_USELEADERELECTION=true
+      - CORE_PEER_GOSSIP_ORGLEADER=false
+      - CORE_LEDGER_STATE_STATEDATABASE=goleveldb
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/peer/msp
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/peer/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/peer/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/peer/tls/ca.crt
+      - CORE_PEER_ID=peer1.org2.togettoyou.com
+      - CORE_PEER_LOCALMSPID=Org2MSP
+      - CORE_PEER_ADDRESS=peer1.org2.togettoyou.com:7051
+      - CORE_PEER_CHAINCODEADDRESS=peer1.org2.togettoyou.com:7052
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.org2.togettoyou.com:7051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer1.org2.togettoyou.com:7051
+    ports:
+      - "8051:7051"
+      - "8053:7053"
+    volumes:
+      - /var/run/docker.sock:/host/var/run/docker.sock
+      - ./crypto-config/peerOrganizations/org2.togettoyou.com/peers/peer1.org2.togettoyou.com:/etc/hyperledger/peer
+      - ./data/peer1.org2.togettoyou.com:/var/hyperledger/production
+      - ./config:/etc/hyperledger/config  # <--- 为 peer0 添加这一行
+      - ./crypto-config:/etc/hyperledger/crypto-config  # <--- 为 peer0 添加这一行
+      - ./configtx.yaml:/etc/hyperledger/configtx.yaml
+    networks:
+      - fabric_togettoyou_network
+    command: peer node start
+
+  org2-backend:
+    image: togettoyou/fabric-realty.server:latest
+    container_name: org2-backend
+
+    volumes:
+      - /usr/share/zoneinfo/Asia/Shanghai:/usr/share/zoneinfo/Asia/Shanghai
+      - ./crypto-config:/network/crypto-config
+      - ./data:/app/data
+      - ./config-docker.yaml:/app/config/config.yaml  # <--- 添加这一行
+    ports:
+      - "8080:8080"
+    networks:
+      - fabric_togettoyou_network
+    environment:
+      - TZ=Asia/Shanghai
+      - ORG_ROLE=org2
+      - FABRIC_GATEWAY_PEER=peer0.org2.togettoyou.com:7051
+
+  org2-frontend:
+    image: togettoyou/fabric-realty.web:latest
+    container_name: org2-frontend
+    ports:
+      - "8000:80"
+    networks:
+      - fabric_togettoyou_network
+    volumes: # <--- 如果没有 volumes，请添加
+      - ./org2-nginx.conf:/etc/nginx/conf.d/default.conf # <--- 添加这一行
+    environment:
+      - VUE_APP_API_BASE_URL=http://org2-backend:8080
+  cli:
+    container_name: cli
+    image: hyperledger/fabric-tools:2.5.10
+    tty: true
+    environment:
+      - GOPROXY=https://goproxy.cn,direct
+      - FABRIC_CFG_PATH=/etc/hyperledger        # <--- 请务必添加这一行！
+      - CORE_PEER_ID=cli
+      - CORE_PEER_ADDRESS=peer0.org2.togettoyou.com:7051
+      - CORE_PEER_LOCALMSPID=Org2MSP
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/crypto-config/peerOrganizations/org2.togettoyou.com/peers/peer0.org2.togettoyou.com/tls/ca.crt
+    working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
+    command: /bin/bash
+    volumes:
+      - ./configtx.yaml:/etc/hyperledger/configtx.yaml
+      - ./crypto-config.yaml:/etc/hyperledger/crypto-config.yaml
+      - ./config:/etc/hyperledger/config
+      - ./crypto-config:/etc/hyperledger/crypto-config
+      - ./../chaincode:/opt/gopath/src/chaincode
+    networks:
+      - fabric_togettoyou_network

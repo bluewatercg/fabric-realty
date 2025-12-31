@@ -124,13 +124,31 @@ smart_commit_and_push() {
          read -r ans; [[ "$ans" == "y" ]] && git stash pop
     fi
 
-    # 2. 选择文件
-    local files=$(git status --porcelain | fzf -m --ansi --prompt="选择文件 (Tab多选) > " \
-        --preview="echo {} | awk '{print \$2}' | xargs git diff --color=always")
+    # 2. 选择文件 (修复中文乱码 & 支持带空格的文件名)
+    # ---------------------------------------------------------
+    # 关键修改：
+    # 1. git -c core.quotePath=false: 强制输出正常中文，不转义
+    # 2. awk + sed: 更安全地剥离文件路径（哪怕文件名里有空格）
+    # ---------------------------------------------------------
+    local files=$(git -c core.quotePath=false status --porcelain -uall | fzf -m --ansi --prompt="选择文件 (Tab多选) > " \
+        --preview="stat=\$(echo {} | awk '{print \$1}'); \
+                   # 提取文件名，处理可能存在的空格
+                   file=\$(echo {} | awk '{\$1=\"\"; print \$0}' | sed 's/^[ \t]*//'); \
+                   if [[ \"\$stat\" == '??' ]]; then \
+                       if command -v bat >/dev/null; then bat --color=always --style=numbers \"\$file\"; else cat \"\$file\"; fi; \
+                   else \
+                       git diff --color=always -- \"\$file\"; \
+                   fi")
+                   
     [[ -z "$files" ]] && return
-    echo "$files" | awk '{print $2}' | xargs git add
+    
+    # 3. 提交选中的文件 (处理文件名中的空格)
+    # 使用 while read 循环安全地处理每一行文件名
+    echo "$files" | awk '{$1=""; print $0}' | sed 's/^[ \t]*//' | while read -r file; do
+        git add "$file"
+    done
 
-    # 3. 生成 Message
+    # 4. 生成 Message
     local mode=$(printf "✨ AI 生成 (DeepSeek)\n📝 手动输入\n🔙 取消" | fzf --prompt="Commit Message > ")
     local msg=""
     
@@ -145,16 +163,14 @@ smart_commit_and_push() {
         *) git reset; return ;;
     esac
 
-    # 4. 提交并默认推送
+    # 5. 提交并默认推送
     if [[ -n "$msg" ]]; then
         if git commit -m "$msg"; then
             echo -e "${C_SUCCESS}🎉 本地提交成功！${C_RESET}"
             echo ""
-            # 重点修改：默认 Yes，提示符改为 [Y/n]
             echo -e "${C_WARN}🚀 是否立即推送到远程？ [Y/n] (默认: Yes)${C_RESET}"
             read -r push_ans
             
-            # 如果输入为空，默认为 Y
             [[ -z "$push_ans" ]] && push_ans="Y"
             
             if [[ "$push_ans" =~ ^[Yy] ]]; then
@@ -166,7 +182,6 @@ smart_commit_and_push() {
         fi
     fi
 }
-
 # ----------------------------
 # 5. 目录级文件审计
 # ----------------------------
