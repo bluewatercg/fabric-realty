@@ -47,10 +47,11 @@ check_dependencies
 # 2. 核心 UI 面板
 # ----------------------------
 get_status_header() {
-    local added=$(git status --porcelain | grep -c '^A ' | tr -d '[:space:]' || echo 0)
-    local modified=$(git status --porcelain | awk '$1 ~ /^(M|MM|AM)/ {count++} END {print count+0}' | tr -d '[:space:]')
-    local deleted=$(git status --porcelain | grep -c '^D ' | tr -d '[:space:]' || echo 0)
-    local untracked=$(git status --porcelain | grep -c '^?? ' | tr -d '[:space:]' || echo 0)
+    local status=$(git status --porcelain -unormal)
+    local added=$(echo "$status" | grep -c '^A ' | tr -d '[:space:]' || echo 0)
+    local modified=$(echo "$status" | awk '$1 ~ /^(M|MM|AM)/ {count++} END {print count+0}' | tr -d '[:space:]')
+    local deleted=$(echo "$status" | grep -c '^D ' | tr -d '[:space:]' || echo 0)
+    local untracked=$(echo "$status" | grep -c '^?? ' | tr -d '[:space:]' || echo 0)
     
     local branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "Unknown")
     local repo=$(git config --get remote.origin.url | sed 's/.*github.com[:/]\(.*\)\.git/\1/' | sed 's/\.git$//' | tr -d '[:space:]' || echo "Local")
@@ -75,7 +76,7 @@ get_status_header() {
 # 3. 辅助工具 (自动 Stash)
 # ----------------------------
 has_uncommitted() {
-    [[ -n "$(git status --porcelain)" ]]
+    [[ -n "$(git status --porcelain -unormal)" ]]
 }
 
 auto_stash() {
@@ -126,7 +127,7 @@ smart_commit_and_push() {
     fi
 
     # 2. 选择文件 (修复中文乱码 & 支持带空格的文件名)
-    local files=$(git -c core.quotePath=false status --porcelain -uall | fzf -m --ansi --prompt="选择文件 (Tab多选) > " \
+    local files=$(git -c core.quotePath=false status --porcelain -unormal | fzf -m --ansi --prompt="选择文件 (Tab多选) > " \
         --preview="stat=\$(echo {} | awk '{print \$1}'); \
                    # 提取文件名，处理可能存在的空格
                    file=\$(echo {} | awk '{\$1=\"\"; print \$0}' | sed 's/^[ \t]*//'); \
@@ -217,7 +218,7 @@ file_history_explorer() {
 # ----------------------------
 live_diff_viewer() {
     # 1. 检查是否有变更
-    if [[ -z "$(git status --porcelain)" ]]; then
+    if [[ -z "$(git status --porcelain -unormal)" ]]; then
         echo -e "${C_SUCCESS}✨ 工作区很干净，没有任何变更。${C_RESET}"
         read -n 1 -s -r
         return
@@ -225,7 +226,7 @@ live_diff_viewer() {
 
     # 2. 构建带颜色的文件列表
     # 修复点：添加 IFS= 防止 read 命令吞掉行首的空格，导致文件名首字母丢失
-    local file_list=$(git -c core.quotePath=false status --porcelain -uall | while IFS= read -r line; do
+    local file_list=$(git -c core.quotePath=false status --porcelain -unormal | while IFS= read -r line; do
         local stat_code="${line:0:2}"
         local file_path="${line:3}"
         
